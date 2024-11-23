@@ -1,11 +1,10 @@
 ---
-title: 'Assignment 2: Data visualization'
-author: "Tamas Nagy"
+title: "assignment_2_plotting_s.Rmd"
+author: "Serban Aliz"
+date: "2024-11-23"
 output: html_document
-editor_options: 
-  chunk_output_type: console
+chunk_output_type: console
 ---
-
 You will have to create 3 plots based on the datasets and instructions detailed below. You will find the plots themeselves in the `assignments/assignment_2_plots`. Your task is to write the code that will reproduce the plots as closely as possible.
 
 # Skills needed to solve this assignment
@@ -16,11 +15,13 @@ You will have to create 3 plots based on the datasets and instructions detailed 
 -   Data manipulation (e.g. dplyr, tidyr), and working with factors (forcats)
 -   Data visuzlization (ggplot2)
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(tidytuesdayR)
 ```
+
 
 ## Task 1: Climbing expeditions
 
@@ -31,7 +32,38 @@ The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the thre
 -   The bar colors use the viridis palette and light theme.
 
 ```{r}
+# load the data
+tt_output <- tt_load("2020-09-22")
+expeditions <- tt_output$expeditions
 
+expeditions %>%
+  # get the 15 most frequent peaks
+  mutate(peaks = forcats::fct_lump(expeditions$peak_name, n = 15)) %>%
+  # drop the "Other" category
+  filter(peaks != "Other") %>%
+  # for each peak and season
+  group_by(peaks, season) %>%
+  # find the number of expeditions
+  summarise(n_expeditions = n()) %>%
+  # find total expeditions for each peak
+  mutate(total_expeditions = sum(n_expeditions)) %>%
+  # create a barplot
+  ggplot(aes(x = fct_reorder(peaks, total_expeditions),
+             y = n_expeditions,
+             fill = season)) +
+  geom_col() +
+  # make the plot horizontal
+  coord_flip() +
+  # change bar colors
+  scale_fill_viridis_d() +
+  # change to ligt theme
+  theme_light() +
+  # move legend to bottom
+  theme(legend.position = "bottom") +
+  # change axis labels and add a title
+  labs(y = "Number of expeditions",
+       x = "",
+       title = "The 15 most popular peaks stacked by season of expedition")
 ```
 
 ## Task 2: PhDs awarded
@@ -45,7 +77,30 @@ Notes:
 -   The line size is 1.2, the colors are from the brewer "Dark2" palette. The theme is set to minimal.
 
 ```{r}
+# load the data
+tt_output <- tt_load("2019-02-19")
+phd_by_field <- tt_output$phd_by_field
 
+phd_by_field %>%
+  # aggregate the data to count all phd-s by broad fields and year
+  group_by(broad_field, year) %>%
+  summarise(n_phds = sum(n_phds, na.rm = TRUE)) %>%
+  # create a line plot
+  ggplot(aes(x = year, y = n_phds, col = broad_field)) +
+  geom_line(linewidth = 1.2) +
+  # make the x axis breaks pretty
+  scale_x_continuous(breaks = scales::pretty_breaks()) +
+  # make the y axis labels comma formatted
+  scale_y_continuous(labels = scales::comma_format()) +
+  # change color palette
+  scale_color_brewer(palette = "Dark2") +
+  # change theme to minimal
+  theme_minimal() +
+  # change axis labels and add a title
+  labs(x = "",
+       y = "",
+       col = "Broad field",
+       title = "Number of awarded Ph.D.-s in the US by year")
 ```
 
 ## Task 3: Commute in the US
@@ -59,5 +114,29 @@ Notes:
 -   The point size is 2, . The theme is set to light.
 
 ```{r}
+# load the data
+tt_output <- tt_load("2019-11-05")
+commute <- tt_output$commute
 
+commute %>%
+  # convert data to wide format
+  pivot_wider(names_from = mode, values_from = n) %>%
+  # aggregate the data to count all commutes by state
+  group_by(state_region, state_abb) %>%
+  summarise(n_walk = sum(Walk, na.rm = TRUE),
+            n_bike = sum(Bike, na.rm = TRUE)) %>%
+  # create a scatterplot
+  ggplot(aes(x = n_walk, y = n_bike, col = state_region, label = state_abb)) +
+  geom_point(size = 2) +
+  geom_text(col = "black", check_overlap = TRUE) +
+  # log transform axis scales and comma format the labels
+  scale_x_log10(labels = scales::comma_format()) +
+  scale_y_log10(labels = scales::comma_format(), limits = c(20, NA)) +
+  # change theme
+  theme_light() +
+  # change axis labels and add a title
+  labs(x = "Number of ppl walking to work (log N)",
+       y = "Number of ppl biking to work (log N)",
+       col = "State region",
+       title = "Title number of people walking vs. biking to work in each USA state")
 ```
