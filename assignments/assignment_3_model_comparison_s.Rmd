@@ -1,6 +1,6 @@
 ---
 title: "Assignment 3: Model comparison"
-author: "Marton Kovacs"
+author: "Marton Kovacs (Resolved by David Kelemen)"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -57,9 +57,23 @@ In your discussion of the findings, briefly interpret the results of the above a
 ## Read the data
 
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
+```{r}
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+library(broom)
+library(car)
+library(dplyr)
+library(gridExtra)
+library(lm.beta)
+library(lmtest)
+library(purrr)
+library(readxl)
+
+```
 
 ```{r}
-
+print(getwd())
+data <- read_excel(file.path("C:/Users/kdawi/OneDrive/Dokumentumok/R-2024", "data", "assignment_3_dataset_.xlsx"))
+data
 ```
 
 ## Data and model diagnostics 
@@ -70,6 +84,11 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
 
+str(data)
+summary(data)
+sum(is.na(data))
+unique(data$sex)
+
 ```
 
 #### Correct coding errors
@@ -77,7 +96,33 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+valid_data_conditions_list <- list(
+  0 <= data$pain & data$pain <= 10,
+  20 <= data$STAI_trait & data$STAI_trait <= 80,
+  0 <= data$pain_cat & data$pain_cat <= 52,
+  1 <= data$mindfulness & data$mindfulness <= 6,
+  18 <= data$age & data$age <= 100,
+  0 <= data$cortisol_serum,
+  0 <= data$cortisol_saliva,
+  40 <= data$weight,
+  0 <= data$household_income
+)
 
+
+
+valid_data_condition <- reduce(valid_data_conditions_list, `&`)
+print("Incorrect values:")
+print(data[!valid_data_condition, ])
+
+valid_data <- data[valid_data_condition, ]
+
+valid_data <- valid_data %>%
+  mutate(sex = case_when( sex == "woman" ~ "female", TRUE ~ sex))
+
+
+unique(valid_data$sex)
+
+valid_data
 ```
 
 ### Model diagnostics
@@ -86,6 +131,8 @@ If you find values in the dataset during the EDA, that are not correct based on 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
+model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = valid_data)
+summary(model)
 
 ```
 
@@ -94,7 +141,24 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+cooksd <- cooks.distance(model)
 
+# Plot Cook's Distance
+plot(cooksd, type = "h", main = "Cook's Distance", ylab = "Cook's Distance")
+threshold <- min(1, 4 / (nrow(valid_data) - length(model$coefficients)))
+abline(h = threshold, col = "red")
+
+# Identify points with high Cook's Distance
+influential <- which(cooksd > threshold)
+print("Influential points based on Cook's Distance:")
+print(influential)
+```
+
+```{r}
+cleaned_data <- valid_data[-influential, ]
+
+new_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = cleaned_data)
+summary(new_model)
 ```
 
 #### Checking assumptions
@@ -103,18 +167,36 @@ Check the normality assumption.
 
 ```{r}
 
+shapiro_test <- shapiro.test(residuals(new_model))
+print(shapiro_test)
+
+qqnorm(residuals(new_model), main = "Q-Q Plot")
+qqline(residuals(new_model), col = "red")
+
+```
+
+```{r}
+hist(residuals(new_model), main = "Histogram of Residuals", xlab = "Residuals", breaks = 20)
 ```
 
 Check the linearity assumption.
 
 ```{r}
-
+plot(new_model, which = 1, main = "Residuals vs Fitted")
+crPlots(new_model)
+avPlots(new_model)
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
+# Perform the Breusch-Pagan test
+bp_test <- bptest(new_model)
+print(bp_test)
 
+# Perform the NCV test
+ncv_test <- ncvTest(new_model)
+print(ncv_test)
 ```
 
 Check the multicollinearity assumption.
@@ -126,7 +208,15 @@ https://statisticalhorizons.com/multicollinearity
 http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis
 
 ```{r}
+vif_values <- vif(new_model)
+print(vif_values)
 
+high_vif <- vif_values[vif_values > 3]
+print("Predictors with high VIF:")
+print(high_vif)
+
+# cortisol_serum and cortisol_saliva whas >5 value - keep cortisol_saliva
+# as this variable is significant in the model
 ```
 
 ### Making decision based on model diagnostics
@@ -134,12 +224,36 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
+updated_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = cleaned_data)
+summary(updated_model)
+
+updated_vif_values <- vif(updated_model)
+print("VIF values for each predictor in the updated model:")
+print(updated_vif_values)
 
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+cooksd <- cooks.distance(updated_model)
+
+# Plot Cook's Distance
+plot(cooksd, type = "h", main = "Cook's Distance", ylab = "Cook's Distance")
+threshold <- 4 / (nrow(cleaned_data) - length(model$coefficients))
+abline(h = threshold, col = "red")
+
+# Identify points with high Cook's Distance
+influential <- which(cooksd > threshold)
+print("Influential points based on Cook's Distance:")
+print(influential)
+```
+
+```{r}
+updated_data <- cleaned_data[-influential, ]
+
+updated_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = updated_data)
+summary(updated_model)
 
 ```
 
@@ -148,25 +262,46 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 Normality assumption
 
 ```{r}
+shapiro_test <- shapiro.test(residuals(updated_model))
+print(shapiro_test)
 
+qqnorm(residuals(updated_model), main = "Q-Q Plot")
+qqline(residuals(updated_model), col = "red")
+```
+
+```{r}
+hist(residuals(updated_model), main = "Histogram of Residuals", xlab = "Residuals", breaks = 20)
 ```
 
 Linearity assumption
 
 ```{r}
-
+plot(updated_model, which = 1, main = "Residuals vs Fitted")
+crPlots(updated_model)
+avPlots(updated_model)
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
+# Perform the Breusch-Pagan test
+bp_test <- bptest(updated_model)
+print(bp_test)
 
+# Perform the NCV test
+ncv_test <- ncvTest(updated_model)
+print(ncv_test)
 ```
 
 Multicollinearity assumption
 
 ```{r}
+vif_values <- vif(updated_model)
+print(vif_values)
 
+high_vif <- vif_values[vif_values > 3]
+print("Predictors with high VIF:")
+print(high_vif)
 ```
 
 ## Model comparison
@@ -174,18 +309,128 @@ Multicollinearity assumption
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
-
+simple_model <- lm(pain ~ age + sex, data = updated_data)
+simple_summary <- summary(simple_model)
+print(simple_summary)
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
-
+complex_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = updated_data)
+complex_summary <- summary(complex_model)
+print(complex_summary)
 ```
 
 Compare the two models.
 
 ```{r}
+# Extract key metrics for comparison
+simple_r_squared <- simple_summary$r.squared
+simple_adj_r_squared <- simple_summary$adj.r.squared
+simple_f_statistic <- simple_summary$fstatistic
+simple_residual_se <- simple_summary$sigma
+simple_aic <- AIC(simple_model)
+simple_bic <- BIC(simple_model)
+
+complex_r_squared <- complex_summary$r.squared
+complex_adj_r_squared <- complex_summary$adj.r.squared
+complex_f_statistic <- complex_summary$fstatistic
+complex_residual_se <- complex_summary$sigma
+complex_aic <- AIC(complex_model)
+complex_bic <- BIC(complex_model)
+
+# Reporting the results
+cat("Simple Model Summary:\n")
+cat("R-squared:", simple_r_squared, "\n")
+cat("Adjusted R-squared:", simple_adj_r_squared, "\n")
+cat("F-statistic:", simple_f_statistic[1], "on", simple_f_statistic[2], "and", simple_f_statistic[3], "DF, p-value:", pf(simple_f_statistic[1], simple_f_statistic[2], simple_f_statistic[3], lower.tail = FALSE), "\n")
+cat("Residual Standard Error:", simple_residual_se, "\n")
+cat("AIC value:", simple_aic, "\n")
+cat("BIC value:", simple_bic, "\n\n")
+
+
+cat("Complex Model Summary:\n")
+cat("R-squared:", complex_r_squared, "\n")
+cat("Adjusted R-squared:", complex_adj_r_squared, "\n")
+cat("F-statistic:", complex_f_statistic[1], "on", complex_f_statistic[2], "and", complex_f_statistic[3], "DF, p-value:", pf(complex_f_statistic[1], complex_f_statistic[2], complex_f_statistic[3], lower.tail = FALSE), "\n")
+cat("Residual Standard Error:", complex_residual_se, "\n")
+cat("AIC value:", complex_aic, "\n")
+cat("BIC value:", complex_bic, "\n\n")
+# Complex model explains 50% of the variance, simple model only 9%.
+# AIC and BIC also show that complex model is better.
+```
+
+```{r}
+# Unstandardized coefficients and confidence intervals
+simple_coef <- tidy(simple_model, conf.int = TRUE)
+complex_coef <- tidy(complex_model, conf.int = TRUE)
+
+
+# Standardized coefficients
+simple_std_coef <- lm.beta(simple_model)
+complex_std_coef <- lm.beta(complex_model)
+
+# Combine results into a data frame
+simple_results <- simple_coef %>%
+  mutate(Std_Coefficient = simple_std_coef$standardized.coefficients) %>%
+  select(term, estimate, conf.low, conf.high, Std_Coefficient, p.value)
+
+complex_results <- complex_coef %>%
+  mutate(Std_Coefficient = complex_std_coef$standardized.coefficients) %>%
+  select(term, estimate, conf.low, conf.high, Std_Coefficient, p.value)
+
+# Print the results
+print(simple_results)
+print(complex_results)
 
 ```
 
+```{r}
+construct_equation <- function(model) {
+  # Extract coefficients
+  coefs <- summary(model)$coefficients
+  
+  # Initialize the equation with the intercept
+  equation <- paste0("Y = ", round(coefs[1, "Estimate"], 2))
+  
+  # Loop through the coefficients and add them to the equation
+  for (i in 2:nrow(coefs)) {
+    term <- rownames(coefs)[i]
+    estimate <- round(coefs[i, "Estimate"], 2)
+    if (estimate != 0) {
+      sign <- ifelse(estimate >= 0, "+", "-")
+      equation <- paste0(equation, " ", sign, " ", abs(estimate), " * ", term)
+    }
+  }
+  
+  return(equation)
+}
+```
+
+```{r}
+
+simple_coefficients <- simple_summary$coefficients
+complex_coefficients <- complex_summary$coefficients
+
+# Print the coefficients
+print(simple_coefficients)
+print(complex_coefficients)
+
+# Construct the equation for model
+simple_equation_model <- construct_equation(simple_model)
+complex_equation_model <- construct_equation(complex_model)
+
+# Print the equation
+print("Simple model formula:")
+print(simple_equation_model)
+print("Complex model formula:")
+print(complex_equation_model)
+
+
+```
+
+```{r}
+anova_result <- anova(simple_model, complex_model)
+print(anova_result) # Complex model is significantly better than simple model
+```
