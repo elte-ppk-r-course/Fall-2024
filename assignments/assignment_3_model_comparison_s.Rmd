@@ -134,13 +134,43 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
+<<<<<<< Updated upstream
 
+=======
+#creating a nmean variable on cortisol
+pain_data_clean <- pain_data_clean %>%
+  mutate(cortisol_mean = rowMeans(cbind(cortisol_saliva, cortisol_serum)))
+view(pain_data_clean) 
+  
+  
+complex_model_3 <- lm(pain ~ age+ sex + STAI_trait+ pain_cat+ mindfulness + cortisol_mean, data= pain_data_clean)
+summary(complex_model_3)
+>>>>>>> Stashed changes
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+<<<<<<< Updated upstream
 
+=======
+complex_model_3 <- lm(pain ~ age+ sex + STAI_trait+ pain_cat+ mindfulness + cortisol_mean, data= pain_data_clean)
+
+#Cook's distance
+cooks_d_2 <- cooks.distance(complex_model_3)
+
+#Influential points
+influential_2 <- which(cooks_d_2 > 4/nrow(pain_data_clean))
+
+# Create new dataset without outliers
+pain_data_clean_2 <- pain_data_clean[-influential_2, ]
+
+
+
+# Refit model
+new_complex_model_2 <- lm(pain ~ age+ sex + STAI_trait+ pain_cat+ mindfulness + cortisol_mean, data= pain_data_clean_2)
+summary(new_complex_model_2)
+>>>>>>> Stashed changes
 ```
 
 #### Checking assumptions of the updated model
