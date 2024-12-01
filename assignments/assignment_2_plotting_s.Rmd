@@ -1,63 +1,208 @@
 ---
 title: 'Assignment 2: Data visualization'
-author: "Tamas Nagy"
+author: "Eszter Palócz"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
 
-You will have to create 3 plots based on the datasets and instructions detailed below. You will find the plots themeselves in the `assignments/assignment_2_plots`. Your task is to write the code that will reproduce the plots as closely as possible.
-
-# Skills needed to solve this assignment
-
--   Using R and RStudio, reading data
--   Reporting using RMarkdown
--   Using Git and Github (for submitting the task)
--   Data manipulation (e.g. dplyr, tidyr), and working with factors (forcats)
--   Data visuzlization (ggplot2)
+```{r}
+# Set a CRAN mirror
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+```
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(ggplot2)
+install.packages("tidytuesdayR")
 library(tidytuesdayR)
 ```
 
 ## Task 1: Climbing expeditions
-
-The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the three datasets, use the "expeditions". Reproduce the plot below! Notice a few things:
-
--   Use `forcats::fct_lump()` to get the 15 most frequent peaks, and drop the "Other" category.
--   The bars are ordered by the sum of all expeditions (use `fct_reorder()`).
--   The bar colors use the viridis palette and light theme.
+### Dowloading and installing the necessary packages and data 
+```{r}
+#Getting the data 
+tuesdata <- tidytuesdayR::tt_load('2020-09-22')
+expeditions <- tuesdata$expeditions
+```
 
 ```{r}
+# Installing necessary packages
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("tidyr")
 
+# Loading the necessary libraries
+library(tidytuesdayR)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(forcats)
 ```
+
+### Exploring the data 
+```{r}
+# Viewing the first few rows of the data
+head(expeditions)
+
+# Basic summary statistics
+summary(expeditions)
+
+# Checking for missing data
+sum(is.na(expeditions))
+```
+
+### Manipulating the data for the plot
+```{r}
+# Apply fct_lump to retain only the 15 most frequent peaks
+expeditions <- expeditions %>%
+  mutate(peak_name = fct_lump(peak_name, n = 15))
+
+# Check the levels of the 'peak' column
+levels(expeditions$peak_name)
+
+# Remove the "Other" category
+expeditions <- expeditions %>%
+  filter(peak_name != "Other")
+
+# View the updated data
+head(expeditions)
+```
+
+### Further manipulations
+```{r}
+# Count the number of expeditions for each peak
+peak_counts <- expeditions %>%
+  group_by(peak_name) %>%
+  summarise(expedition_count = n(), .groups = "drop")
+
+print(peak_counts)
+
+# Reorder the peaks based on the sum of expeditions for each peak using fct_reorder()
+
+expeditions <- expeditions %>%
+  mutate(peak_name = fct_reorder(peak_name, peak_counts$expedition_count[match(peak_name, peak_counts$peak_name)]))
+
+levels(expeditions$peak_name)
+
+expeditions %>%
+  arrange(desc(peak_name))
+```
+
+### Creating the plot 
+```{r}
+# Plot the data 
+install.packages("viridis")
+library(viridis)
+
+expeditions %>%
+  ggplot(aes(y = peak_name, fill = season)) +
+  geom_bar() +
+  scale_fill_viridis(discrete = TRUE) + 
+  labs(title = "The 15 most popular peaks stacked by season of expedition", x = "Number of exhibitions", y = "") +
+  theme_light() +
+  theme(legend.position = "bottom") 
+```
+
 
 ## Task 2: PhDs awarded
-
-The 2019-02-19 TidyTueday dataset is about phd-s awarded by year and field. There is only one dataset, it is called `phd_by_field`. Reproduce the plot below!
-
-Notes:
-
--   First you have to aggregate the data to count all phd-s by broad fields.
--   To make the x axis breaks pretty, use `scales::pretty_breaks()`, to make the y axis labels comma formatted, use `scales::comma_format()`.
--   The line size is 1.2, the colors are from the brewer "Dark2" palette. The theme is set to minimal.
-
+### Dowloading the data from Tidy Tuesday
 ```{r}
+#Loading the data 
+tuesdata <- tidytuesdayR::tt_load('2019-02-19')
 
+phddata <- tuesdata$phd_by_field
 ```
 
-## Task 3: Commute in the US
-
-The 2019-11-05 TidyTueday dataset is about commuting to work in each city in the US by bike or on foot. There is only one dataset, it is called `commute`. Reproduce the plot below!
-
-Notes:
-
--   First you have to aggregate the data to count all commutes by state.
--   Both axis scales are log transformed and the labels comma formatted, using `scales::comma_format()`
--   The point size is 2, . The theme is set to light.
-
+### Checking the data 
 ```{r}
+# Viewing the first few rows of the data and the dataset
+head(phddata)
 
+str(phddata)
+
+# Basic summary statistics
+summary(phddata)
+
+# Checking for missing data
+sum(is.na(phddata))
+```
+
+### Data manipulations for the plot
+```{r}
+# Aggragate the data to count all PhDs by broad field
+str(phddata)
+
+sum_broadfield <- phddata %>%
+  mutate(n_phds = as.numeric(n_phds)) %>%  # Convert n_phds to numeric
+  group_by(broad_field, year) %>%
+  summarise(n_phds = sum(n_phds, na.rm = TRUE), .groups = "drop")
+```
+
+### Creating the plot
+```{r}
+# Plot
+library(scales)
+install.packages("RColorBrewer")
+library(RColorBrewer)
+
+ggplot(sum_broadfield, aes(x = year, y = n_phds, color = broad_field)) +
+  geom_line(size = 1.2) +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(labels = comma_format()) +
+  labs(title = "Total Number of Ph.D.-s in the US by Year",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  scale_color_brewer(palette = "Dark2")
+```
+
+
+## Task 3: Commute in the US
+### Dowloading the data from Tidy Tuesday and checking the data structure
+```{r}
+#Loading the data 
+tuesdata <- tidytuesdayR::tt_load('2019-11-05')
+
+commute <- tuesdata$commute
+
+# Checking the data structure 
+str(commute)
+```
+
+### Data manipulations for the plot
+```{r}
+# Aggregate the data to count all commutes by state
+commute_by_state <- commute %>%
+  group_by(state) %>%
+  summarise(total_commutes = n(), .groups = "drop")
+
+# Checking the first rows of the data 
+head(commute_by_state)
+
+# Number of people walking and biking to work by state
+library(scales)
+
+commute_filtered <- commute %>%
+  filter(mode %in% c("Walk", "Bike")) %>%
+  group_by(state, mode, state_region, state_abb) %>%
+  summarise(total_people = sum(n, na.rm = TRUE), .groups = "drop") %>%
+  spread(key = mode, value = total_people, fill = 0)
+```
+
+### Creating the plot 
+```{r}
+# Creating the plot 
+
+ggplot(commute_filtered, aes(x = Walk, y = Bike, color = state_region)) +
+  geom_point(size = 2) +
+  scale_x_log10(labels = comma_format()) +  
+  scale_y_log10(labels = comma_format()) +  
+  geom_text(aes(label = state_abb), hjust = 0.5, vjust = 0.5, size = 3, check_overlap = TRUE, color = "black") +
+  labs(
+    x = "Number of ppl walking to work (log N)", 
+    y = "Number of people biking to work (log N)", 
+    title = "Number of people walking vs. biking to work in each USA state") +
+  theme_light()
 ```

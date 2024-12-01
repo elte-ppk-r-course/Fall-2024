@@ -1,6 +1,6 @@
 ---
 title: "Assignment 3: Model comparison"
-author: "Marton Kovacs"
+author: "Eszter Palócz"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -54,70 +54,222 @@ In your discussion of the findings, briefly interpret the results of the above a
 
 # Solution
 
-## Read the data
+## Reading the data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 
-Read the dataset used in this assignment. Pay attention to the extension of the datafile.
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(lmtest)
+library(car)
+library(knitr)
 
-```{r}
+# Dataset
+url <- "https://github.com/elte-ppk-r-course/Fall-2024/raw/refs/heads/main/data/assignment_3_dataset_.xlsx"
 
+temp_file <- tempfile(fileext = ".xlsx")
+
+download.file(url, temp_file, mode = "wb")
+
+paindata <- read_excel(temp_file)
 ```
 
 ## Data and model diagnostics 
+
 ### Data diagnostics
-#### Descriptives of the variables
-
-Run an exploratory data analysis (EDA) to investigate the dataset.
-
 ```{r}
+# Viewing the first few rows of the dataset
+head(paindata)
 
+# Checking the structure of the data (data types, missing values)
+str(paindata)
+
+# Dropping variables that are not needed for the analysis (weight, IQ, household income)
+paindata <- paindata %>% dplyr::select(-weight, -IQ, -household_income)
+
+# Checking the new dataset again
+head(paindata)
+str(paindata)
+summary(paindata)
+
+# Changing the variable sex to factor
+paindata$sex <- as.factor(paindata$sex)
+
+# Mindfulness scale is 1 to 6, however there is a value over 6. Filtering the values over 6
+paindata <- paindata %>%
+ filter(mindfulness <= 6)
+
+summary(paindata$mindfulness)
 ```
 
-#### Correct coding errors
+```{r}
+# Checking for missing values
+colSums(is.na(paindata))
+```
 
-If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
+There are no missing values in the data. 
+
+### Descriptive statistics for variables 
+```{r}
+# Summary (descriptive) statistics for all variables
+summary(paindata)
+```
+
+## Running an exploratory data analysis (EDA) to investigate the dataset.
+### Checking for the distribution of the data 
+```{r}
+# Histogram of numeric variables
+paindata %>% 
+  select_if(is.numeric) %>%  # Select numeric columns
+  gather() %>%
+  ggplot(aes(x=value)) + 
+  geom_histogram(bins = 30, fill = "blue", alpha = 0.7) +
+  facet_wrap(~key, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "Histograms of Numeric Variables")
+
+# Histogram of the variable sex
+ggplot(paindata, aes(x = sex)) +
+  geom_bar(fill = "lightblue", color = "black") +
+  labs(title = "Bar Chart of Sex", x = "Sex", y = "Count") +
+  theme_minimal()
+```
+
+The histograms and boxplots of variables show that there are some potential outliers 
+that need to be explored further (variable: pain).
+
+The histogram of the variable 'sex' shows that there is an element coded as "woman", 
+which seems to be a coding error and needs to be put under "female". 
+
+
+### Detecting outliers 
+```{r}
+# Boxplots to detect outliers
+par(mfrow = c(2, 3))
+boxplot(paindata$age, main = "Age")
+boxplot(paindata$pain, main = "Pain")
+boxplot(paindata$STAI_trait, main = "STAI_trait")
+boxplot(paindata$pain_cat, main = "Pain Catastrophizing")
+boxplot(paindata$mindfulness, main = "Mindfulness")
+boxplot(paindata$cortisol_serum, main = "Cortisol Serum")
+boxplot(paindata$cortisol_saliva, main = "Cortisol Saliva")
+```
+
+Further explorations with boxplots show an extreme value in the variable pain which seems 
+to be a coding error. Next, influential outliers will be checked with Cook's distance.
+
+
+### Checking influential outliers on the complex model
+```{r}
+# Fitting the complex model (age, sex, STAI_trait, pain_cat, mindfulness, cortisol_serum, cortisol_saliva)
+complex_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = paindata)
+
+# Calculating Cook's distance
+cooksd <- cooks.distance(complex_model)
+
+# Cook's distance - plot 
+plot(cooksd, main = "Cook's Distance", ylab = "Cook's Distance", pch = 20)
+abline(h = 4 / nrow(paindata), col = "red", lty = 2)  # Threshold line at 4/n
+
+# Identify influential points
+influential_points <- which(cooksd > (4 / nrow(paindata)))
+paindata[influential_points, ]
+```
+
+As expected, it was found with Cook's distance that the variable pain includes 
+an extreme value that is a coding error, therefore this value needs to be filtered (below). 
+
+
+#### Correcting coding errors
 
 ```{r}
+# Correcting the coding error in sex
+paindata <- paindata %>%
+  mutate(sex = dplyr::recode(sex, "woman" = "female"))
 
+# Excluding the extreme value from pain that is a coding error
+paindata_filtered <- paindata %>% filter(pain != 50)
+
+# Checking new boxplot for pain
+boxplot(paindata_filtered$pain, main = "Pain")
 ```
 
 ### Model diagnostics
-#### Build the more complex model
+#### Building the more complex model
 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
+# Fitting the model without the outlier
+model_filtered <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = paindata_filtered)
 
+# Model summary
+summary(model_filtered)
 ```
 
-#### Checking for influential outliers
-
-Check for outlier values in the model.
+#### Checking for influential outliers in the complex, filtered model
 
 ```{r}
+# Calculate Cook's distance
+cooksd <- cooks.distance(model_filtered)
 
+# Plot Cook's distance
+plot(cooksd, main = "Cook's Distance", ylab = "Cook's Distance", pch = 20)
+abline(h = 4 / nrow(paindata), col = "red", lty = 2)  # Threshold line at 4/n
+
+# Identify influential points
+influential_points <- which(cooksd > (4 / nrow(paindata)))
+paindata[influential_points, ]
 ```
 
-#### Checking assumptions
+Based on the analysis with Cook's distance, other values are not influential outliers. 
 
-Check the normality assumption.
+### Checking assumptions 
+
+#### Checking the normality assumption.
+```{r}
+# Residuals from the complex model
+residuals_complex <- residuals(model_filtered)
+
+# Q-Q plot of residuals
+qqnorm(residuals_complex)
+qqline(residuals_complex, col = "red")
+
+# Histogram of residuals
+hist(residuals_complex, main = "Histogram of Residuals", xlab = "Residuals", col = "blue", breaks = 30)
+
+# Shapiro-Wilk test
+shapiro.test(residuals(model_filtered))
+```
+
+The Q-Q plot and histogram, and the results of the Shapiro-Wilk test show that the data is approximately normally distributed 
+(the data points mostly follow the linear red line with some small deviations).
+
+### Checking the linearity assumption.
+```{r}
+plot(model_filtered, which = 1)
+```
+
+The assumption of linearity is met. 
+
+
+### Checking the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
+bptest(model_filtered)
 
+plot(model_filtered, which = 3)
 ```
 
-Check the linearity assumption.
+The assumption of homoscedasticity is met.
 
-```{r}
 
-```
-
-Check the homoscedasticty assumption (homogeneity of variance).
-
-```{r}
-
-```
-
-Check the multicollinearity assumption.
+### Checking the multicollinearity assumption.
 
 (VIF above 5), or a VIF threshold of 3 is recommended in this paper: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2009.00001.x/full
 
@@ -126,66 +278,198 @@ https://statisticalhorizons.com/multicollinearity
 http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis
 
 ```{r}
-
+library(car)
+vif(model_filtered)
 ```
+
+The results of the multicollinearity check suggest that two variables (cortisol_serum and cortisol_saliva) exceed the threshold of VIF of 5, which indicates moderate to high multicollinearity between these two variables, therefore they are most likely strongly correlated with each other. In the description of the cortisol variables, it is suggested serum cortisol is found to be more reliably related to stress in medical research, therefore I will keep this variable and drop cortisol_saliva from the model. 
 
 ### Making decision based on model diagnostics
 
-If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
+Based on the assumption tests, I decided to drop a predictor variable (cortisol_saliva). I will create the updated model. 
 
 ```{r}
+# Updated model, without cortisol_saliva
+model_filtered_updated <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum, data = paindata_filtered)
 
+summary(model_filtered_updated)
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+cooksd <- cooks.distance(model_filtered_updated)
 
+original_data <- model_filtered_updated$model_filtered
+
+plot(cooksd, main = "Cook's Distance", ylab = "Cook's Distance", pch = 20)
+abline(h = 4 / nrow(original_data), col = "red", lty = 2)
+
+influential_points <- which(cooksd > (4 / nrow(original_data)))
+original_data[influential_points, ]
 ```
+
+No influential outliers were found based on Cook's Distance. 
+
 
 #### Checking assumptions of the updated model
 
 Normality assumption
 
 ```{r}
+# Calculating residuals
+residuals_complex <- residuals(model_filtered_updated)
 
+# Shapiro-Wilk test
+shapiro.test(residuals(model_filtered_updated))
+
+# Histogram of residuals
+hist(residuals_complex, main = "Histogram of Residuals", xlab = "Residuals", col = "blue", breaks = 30)
+
+# Q-Q plot of residuals
+qqnorm(residuals_complex)
+qqline(residuals_complex, col = "red")
 ```
 
-Linearity assumption
+The assumption of normality is met. 
+
+### Linearity assumption
 
 ```{r}
+plot(model_filtered_updated, which = 1)
 
+raintest(model_filtered_updated)
 ```
 
-Homoscedasticty assumption (homogeneity of variance)
+The assumption of linearity is met. 
+
+
+### Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
+bptest(model_filtered_updated)
 
+plot(model_filtered_updated, which = 3)
 ```
 
-Multicollinearity assumption
+The assumption of homoscedasticity is met. 
+
+### Multicollinearity assumption
 
 ```{r}
-
+vif(model_filtered_updated)
 ```
+
+The assumption of multicollinearity is met in the updated model. 
 
 ## Model comparison
 
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
+simple_model <- lm(pain ~ age + sex, data = paindata_filtered)
 
+summary(simple_model)
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+complex_model_2 <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum, data = paindata_filtered)
 
+summary(complex_model_2)
 ```
 
-Compare the two models.
-
+### Regression equation for the complex model
 ```{r}
+# Extract coefficients from model2
+coefs <- coef(complex_model_2)
 
+# Round the coefficients to 3 decimal places
+coefs <- round(coefs, 3)
+
+# Create the equation string
+equation <- paste("pain =", coefs[1], 
+                  "+", coefs[2], "* age", 
+                  "+", coefs[3], "* sex", 
+                  "+", coefs[4], "* STAI_trait",
+                  "+", coefs[5], "* pain_cat",
+                  "+", coefs[6], "* cortisol_serum",
+                  "+", coefs[7], "* mindfulness", 
+                  sep = "")
+
+print(equation)
 ```
+
+# Comparing the two models.
+```{r}
+# Comparison with likelihood ratio test 
+lrtest(simple_model, complex_model_2)
+
+# Comparison with ANOVA
+anovaresults <- anova(simple_model, complex_model_2)
+print(anovaresults)
+
+# Creating a table with the regression results
+library(stargazer)
+
+regression_result <- stargazer(simple_model, complex_model_2, type = "text",
+          title = "Regression Results",
+          align = TRUE,
+          ci = TRUE, 
+          digit.types = list("pvalue" = 3), 
+          report = "vcsp", 
+          star.cutoffs = c(0.05, 0.01, 0.001), 
+           add.lines=list(c("AIC", round(AIC(simple_model),1), round(AIC(complex_model_2),1))))
+
+# Creating a table format for unstandardized regression coefficients, 95% confidence intervals, standardized regression coefficients (B and Beta values), and p values
+library(broom)
+library(lm.beta)
+
+# Extracting statistics for the simpler model
+simple_model_summary <- tidy(simple_model, conf.int = TRUE)
+simple_model_beta <- lm.beta(simple_model)      
+
+head(simple_model_summary)
+
+simple_model_result <- simple_model_summary %>%
+  mutate(Standardized_Beta = coef(simple_model_beta)) %>%
+  dplyr::select(term, estimate, conf.low, conf.high, Standardized_Beta, p.value) %>%
+  rename("B (Unstandardized)" = estimate,
+         "Lower 95% CI" = conf.low,
+         "Upper 95% CI" = conf.high,
+         "Beta (Standardized)" = Standardized_Beta,
+         "P-value" = p.value)
+
+# Extracting statistics for the complex model
+complex_model_summary <- tidy(complex_model_2, conf.int = TRUE)
+complex_model_beta <- lm.beta(complex_model_2)
+
+# Merging results for complex model
+complex_model_result <- complex_model_summary %>%
+  mutate(Standardized_Beta = coef(complex_model_beta)) %>%
+  dplyr::select(term, estimate, conf.low, conf.high, Standardized_Beta, p.value) %>%
+  rename("B (Unstandardized)" = estimate,
+         "Lower 95% CI" = conf.low,
+         "Upper 95% CI" = conf.high,
+         "Beta (Standardized)" = Standardized_Beta,
+         "P-value" = p.value)
+
+# Printing results in table format
+library(knitr)
+cat("Simple Model Results:\n")
+kable(simple_model_result, digits = 3, format = "markdown")
+
+cat("\nComplex Model Results:\n")
+kable(complex_model_result, digits = 3, format = "markdown")
+```
+
+The results of the analysis show that the complex model is a better fit for the data. This is based on the following results: 
+
+- The results of AIC  are lower for the complex model (528.5), than the simpler model (572.5). 
+- Based on adjusted R-squared, the complex model explains more variance in pain, that is 31.2%, than the simpler model, which explains about 7%. 
+- In the simple model, only age is a significant predictor (β = -0.084, 95%CI: -0.130, -0.039), p = 0.0004). 
+- However, in the complex model, after adding psychological and hormone measures, age is no longer significant, while pain catastrophizing (β = 0.083, 95% CI: 0.028, 0.139, p = 0.004) and cortisol serum (β = 0.543, 95% CI: 0.299, 0.788, p < 0.000) have a positive, significant effect on pain. Other psychological variables, such as STAI_trait and mindfulness were not found significant. 
+
+In conclusion, including the psychological and hormone measures in the model seem to provide value in explaining the variance in pain, which suggests that these measures influence the experience of pain and further research on them could give us more insight on the experience of pain. 
 
