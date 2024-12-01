@@ -1,8 +1,10 @@
 ---
-title: "Assignment 3: Model comparison"
+title: 'Assignment 3: Model comparison'
 author: "Marton Kovacs"
-output: html_document
-editor_options: 
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
   chunk_output_type: console
 ---
 
@@ -60,6 +62,18 @@ Read the dataset used in this assignment. Pay attention to the extension of the 
 
 ```{r}
 
+install.packages("readxl")
+install.packages("car")
+install.packages("lmtest")
+
+library(readxl)
+library(tidyverse)
+library(car) 
+library(lmtest)
+
+data <- read_excel("/Users/annahorgonyi/Documents/suli/2024_fall/Assignments/data/assignment_3_dataset_.xlsx")
+
+
 ```
 
 ## Data and model diagnostics 
@@ -70,6 +84,39 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
 
+# Data diagnostics: Descriptive statistics
+summary(data)
+
+#check variables 
+table(data$sex) #check if there are overlapping values
+table(data$pain) #check if the values are between 0 and 10
+table(data$STAI_trait) #check if the values are between 20 and 80
+
+
+clean_data <- data  # create a copy of the data to preserve the original
+
+# Replace "woman" with "female" in the 'sex' variable
+clean_data$sex[clean_data$sex == "woman"] <- "female"
+
+
+
+# List of variable names and their valid value ranges
+valid_ranges <- list(
+  pain = c(0, 10),  # pain should be between 0 and 10
+  STAI_trait = c(20, 80),  # STAI_trait should be between 20 and 80
+  pain_cat = c(0, 52),  # pain_cat should be between 0 and 52
+  mindfulness = c(1, 6),  # mindfulness should be between 1 and 6
+  cortisol_serum = c(0, Inf),  # no upper limit specified for cortisol_serum
+  cortisol_saliva = c(0, Inf)  # no upper limit specified for cortisol_saliva
+)
+
+# Loop through each variable and check for invalid values
+for (var in names(valid_ranges)) {
+  min_val <- valid_ranges[[var]][1]
+  max_val <- valid_ranges[[var]][2]
+
+
+
 ```
 
 #### Correct coding errors
@@ -77,6 +124,16 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+# Replace values outside the valid range with NA
+  clean_data[[var]] <- ifelse(
+    clean_data[[var]] < min_val | clean_data[[var]] > max_val,
+    NA,
+    clean_data[[var]]
+  )
+}
+
+# Check if any replacements were made
+summary(clean_data)
 
 ```
 
@@ -87,6 +144,12 @@ In order to test the more complex model for outliers and to test the assumptions
 
 ```{r}
 
+# Fit the more complex model with all predictors
+complex_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = clean_data)
+
+# Summary of the complex model
+summary(complex_model)
+
 ```
 
 #### Checking for influential outliers
@@ -94,6 +157,13 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+
+# Check for influential points using Cook's distance
+cooks_distance <- cooks.distance(complex_model)
+
+# Identify observations with Cook's distance 
+influential_points <- which(cooks_distance > (4 / nrow(clean_data)))
+influential_points
 
 ```
 
@@ -103,17 +173,29 @@ Check the normality assumption.
 
 ```{r}
 
+# Q-Q plot for normality of residuals
+qqnorm(residuals(complex_model))
+qqline(residuals(complex_model), col = "red")
+
 ```
 
 Check the linearity assumption.
 
 ```{r}
 
+# Residuals vs. fitted values plot
+plot(fitted(complex_model), residuals(complex_model), main = "Residuals vs Fitted", xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
+
+# Scale-Location plot for homoscedasticity
+plot(complex_model, which = 3) 
 
 ```
 
@@ -127,6 +209,11 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 
 ```{r}
 
+# Check VIF for multicollinearity
+library(car)
+vif(complex_model)
+
+
 ```
 
 ### Making decision based on model diagnostics
@@ -135,11 +222,43 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 
 ```{r}
 
+# Check if 'pain' variable exists and is numeric in clean_data
+if ("pain" %in% names(clean_data) && is.numeric(clean_data$pain)) {
+  # Apply log transformation to pain variable
+  clean_data$log_pain <- log(clean_data$pain + 1)  # Adding 1 to avoid log(0) issues
+} else {
+  stop("Pain variable does not exist or is not numeric")
+}
+
+# Rebuild the model using log-transformed pain
+updated_model <- lm(log_pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = clean_data)
+
+# Check model summary
+summary(updated_model)
+
+# Plot residuals vs fitted values
+plot(updated_model, 1)
+
+# Plot scale-location plot (for homoscedasticity)
+plot(updated_model, 3)
+
+# Check VIF for multicollinearity after removing one cortisol variable
+library(car)
+vif(updated_model)
+
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+
+# Checking for outliers using Cook's distance
+cooks_d <- cooks.distance(updated_model)
+influential_points <- which(cooks_d > (4 / nrow(clean_data)))
+
+# Visualizing Cook's distance
+plot(cooks_d, main="Cook's Distance", type="h", col="red")
+abline(h = 4 / nrow(clean_data), col="blue", lty=2)
 
 ```
 
@@ -149,23 +268,37 @@ Normality assumption
 
 ```{r}
 
+# Plotting histogram and Q-Q plot to check normality of residuals
+par(mfrow=c(1, 2))  
+hist(residuals(updated_model), main="Histogram of Residuals", xlab="Residuals", col="gray", breaks=20)
+qqnorm(residuals(updated_model))
+qqline(residuals(updated_model), col="red")
+par(mfrow=c(1, 1))
+
 ```
 
 Linearity assumption
 
 ```{r}
 
+# Scatter plot of residuals vs fitted values to check for linearity
+plot(updated_model, 1)  # Residuals vs Fitted plot
+
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
-
+# Scale-Location plot to check for homoscedasticity (constant variance)
+plot(updated_model, 3)  # Scale-Location plot
 ```
 
 Multicollinearity assumption
 
 ```{r}
+# Checking for multicollinearity using VIF
+library(car)
+vif(updated_model)
 
 ```
 
@@ -175,11 +308,23 @@ Create the simple model and get the results of the model that needs to be report
 
 ```{r}
 
+# Simple model: pain ~ age + sex
+simple_model <- lm(pain ~ age + sex, data = clean_data)
+
+# Display the summary of the simple model
+summary(simple_model)
+
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+
+# Complex model: pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva
+complex_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = clean_data)
+
+# Display summary
+summary(complex_model)
 
 ```
 
@@ -187,5 +332,17 @@ Compare the two models.
 
 ```{r}
 
+# Comparing models using AIC and BIC
+AIC(simple_model, complex_model)
+BIC(simple_model, complex_model)
+
+# Comparing models with Adjusted R-squared
+cat("Adjusted R-squared for Simple Model:", summary(simple_model)$adj.r.squared, "\n")
+cat("Adjusted R-squared for Complex Model:", summary(complex_model)$adj.r.squared, "\n")
+
+
 ```
+
+## The complex model has lower BIC (measure for goodness of fit), and explains greater proportion of varience of the data, so it seems to be a better fit than the simple model. 
+## The inclusion of psychological and hormonal variables such as trait anxiety, pain catastrophizing, mindfulness, and cortisol levels into the complex model provides a nuanced understanding of postoperative pain, as these measures capture dimensions of pain experience that demographic factors like age and sex cannot fully explain. I personally think the result I got with this analysis is not too surprising in light of previous research. Yet it may worth mentioning that by measuring cortisol from both serum and saliva, the model integrates a biological mechanism of stress regulation that complements the psychological factors, while there are also some aspects what could help elaborate on the issue further: cognitive factors such as executive functioning, or emotional factros such as mood, or state-anxiety. 
 
