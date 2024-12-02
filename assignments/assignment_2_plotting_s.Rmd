@@ -20,6 +20,8 @@ You will have to create 3 plots based on the datasets and instructions detailed 
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(tidytuesdayR)
+library(forcats)
+library(scales)
 ```
 
 ## Task 1: Climbing expeditions
@@ -31,6 +33,29 @@ The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the thre
 -   The bar colors use the viridis palette and light theme.
 
 ```{r}
+
+TidyTueday_data_2020_09_22 <- tt_load('2020-09-22')
+expeditions <- TidyTueday_data_2020_09_22$expeditions
+
+top15_peak <- expeditions %>% 
+  mutate(peak_name = fct_lump(peak_name, n = 15)) %>% 
+  filter(peak_name != "Other") %>% 
+  group_by(peak_name, season) %>%
+  summarise(expeditions_count = n(), .groups = "drop") %>%
+  mutate(peak_name = fct_reorder(peak_name, expeditions_count, .fun = sum))
+
+ggplot(top15_peak, aes(x = expeditions_count, y = peak_name, fill = season)) +
+  geom_bar(stat = "identity", position = "stack") + 
+  scale_fill_viridis_d() +
+  theme_light() +
+  theme(legend.position = "bottom") +
+  labs(
+    title = "The 15 most popular peaks stacked by season of expedition",
+    x = "Number of expeditions",
+    y = NULL,
+    fill = "Season"
+  )
+
 
 ```
 
@@ -45,6 +70,23 @@ Notes:
 -   The line size is 1.2, the colors are from the brewer "Dark2" palette. The theme is set to minimal.
 
 ```{r}
+TidyTueday_data_2019_02_19 <- tt_load('2019-02-19')
+phd_by_field <- TidyTueday_data_2019_02_19$phd_by_field
+
+phd_by_year_field <- phd_by_field %>%
+  group_by(year, broad_field) %>%
+  summarize(phd_count = sum(n_phds, na.rm = T))
+
+ggplot(phd_by_year_field, aes(x = year, y = phd_count, color = broad_field, group = broad_field)) +
+  geom_line(size = 1.2) +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(labels = comma_format()) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal() +
+  labs(title = "Number of awarded Ph.D.-s in the US by Year",
+       x = NULL,
+       y = NULL,
+       color = "Broad field")
 
 ```
 
@@ -59,5 +101,25 @@ Notes:
 -   The point size is 2, . The theme is set to light.
 
 ```{r}
+TidyTueday_data_2019_11_05 <- tt_load('2019-11-05')
+commute <- TidyTueday_data_2019_11_05$commute
 
+commute_by_state <- commute %>%
+  group_by(state_abb, mode) %>%
+  mutate(total_commutes = sum(n, na.rm = T)) %>% 
+  select(state_abb, state_region, mode, total_commutes) %>% 
+  distinct() %>% 
+  pivot_wider(names_from = mode, values_from = total_commutes)
+
+ggplot(commute_by_state, aes(x = Walk, y = Bike, color = state_region)) +
+  geom_point(size = 2) +
+  scale_x_log10(labels = comma_format()) +
+  scale_y_log10(labels = comma_format(), limits = c(20, NA)) +
+  geom_text(aes(label = state_abb),  color = "black", na.rm = TRUE, check_overlap = TRUE) +
+  theme_light() +
+  labs(title = "Title number of people walking vs. biking to work in each USA state",
+       x = "Number of ppl walking to work (log N)",
+       y = "Number of ppl biking to work (log N)",
+       color = "State region")
+  
 ```
