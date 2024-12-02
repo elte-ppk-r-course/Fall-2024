@@ -20,7 +20,27 @@ You will have to create 3 plots based on the datasets and instructions detailed 
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(tidytuesdayR)
+library(viridis)
+library(scales)       
+library(RColorBrewer) 
+
 ```
+
+```{r  Reading datasets}
+#Getting the expeditions data frame
+tuesdata <- tt_load('2020-09-22')
+expeditions_data <- tuesdata$expeditions
+
+#getting the phd_by_field dataframe
+tuesdata2 <- tt_load('2019-02-19')
+phd_data <- tuesdata2$phd_by_field
+
+#getting the commute dataframe
+tuesdata3 <- tt_load('2019-11-05')
+commute_data <- tuesdata3$commute
+
+```
+
 
 ## Task 1: Climbing expeditions
 
@@ -31,6 +51,46 @@ The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the thre
 -   The bar colors use the viridis palette and light theme.
 
 ```{r}
+
+# Use expeditions_data and include both peak_name and season columns
+expeditions <- data.frame(peak_name = expeditions_data$peak_name, season = expeditions_data$season)
+
+# Convert peak_name to a factor before lumping
+expeditions$peak_name <- factor(expeditions$peak_name)
+
+# Get the top 15 most frequent peaks
+expeditions$peak_name <- fct_lump(expeditions$peak_name, n = 15)
+
+# Remove the "Other" category from the factor levels and the data
+expeditions <- expeditions %>% filter(peak_name != "Other")  # Remove "Other" from the data
+expeditions$peak_name <- droplevels(expeditions$peak_name)  # Drop unused factor level "Other"
+
+# Calculate frequencies by peak_name and season
+peak_freq <- as.data.frame(table(expeditions$peak_name, expeditions$season))
+colnames(peak_freq) <- c("peak_name", "season", "frequency")
+
+# Reorder peak_name by total frequency
+peak_freq$peak_name <- fct_reorder(peak_freq$peak_name, peak_freq$frequency, .fun = sum)
+
+# Create the plot
+ggplot(peak_freq, aes(x = frequency, y = peak_name, fill = season)) +
+  geom_col() +  
+  scale_fill_viridis_d() + 
+  labs(
+    title = "The 15 most popular peaks stacked by season of expedition",
+    x = "Number of expedition",
+    y = "Peak Name",
+    fill = "Season"
+  ) +
+  theme_light() +
+  theme(
+    axis.title.y = element_blank(),  
+    axis.text.y = element_text(hjust = 1),  # Align y-axis text to the right
+    legend.position = "bottom",  # Position legend at the bottom
+    legend.title = element_text(hjust = 0.5),  # Center-align legend title
+    legend.justification = "center"  # Center-align legend itself
+  )
+
 
 ```
 
@@ -46,6 +106,26 @@ Notes:
 
 ```{r}
 
+# Summarize data to ensure unique combinations of year and broad_field
+phd_summary <- phd_data %>%
+  group_by(broad_field, year) %>%
+  summarize(total_phds = sum(n_phds, na.rm = TRUE), .groups = 'drop')
+
+# Create the plot
+ggplot(phd_summary, aes(x = year, y = total_phds, color = broad_field, group = broad_field)) +
+  geom_line(size = 1.2) + # Set line size
+  scale_x_continuous(breaks = scales::pretty_breaks()) + # Pretty x-axis breaks
+  scale_y_continuous(labels = scales::comma_format()) + # Comma-formatted y-axis
+  scale_color_brewer(palette = "Dark2") + 
+  labs(
+    title = "Number of awarded Ph.D-s in the US by year",
+    x = "Year",
+    color = "Broad Field"
+  ) +
+  ylab(NULL) +
+  theme_minimal() 
+
+
 ```
 
 ## Task 3: Commute in the US
@@ -58,6 +138,27 @@ Notes:
 -   Both axis scales are log transformed and the labels comma formatted, using `scales::comma_format()`
 -   The point size is 2, . The theme is set to light.
 
+
 ```{r}
+bike_walk_data <- commute_data %>%
+  filter(mode %in% c("Bike", "Walk")) %>% 
+  pivot_wider(names_from = mode, values_from = n, id_cols = c(city, state_abb, state_region), values_fill = 0) %>%
+  group_by(state_abb, state_region) %>% # Group by state abbreviation and region
+  summarise(Walk = mean(Walk, na.rm = TRUE), # Average Walk values
+            Bike = mean(Bike, na.rm = TRUE), # Average Bike values
+            .groups = "drop") %>% 
+  filter(Bike >= 100, Walk >= 1000) #don't know how can I get the same number of dots on my plot
+
+# Scatterplot
+ggplot(bike_walk_data, aes(x = Walk, y = Bike, color = state_region, label = state_abb)) +
+  geom_point(size = 2) +
+  geom_text(color = "black", size = 4) +
+  scale_x_log10(labels = comma_format()) +
+  scale_y_log10(labels = comma_format()) +
+  theme_light() +
+  labs(title = "Title number of people walking vs biking to work in each USA state",
+       x = "Number of ppl walking to work (log N)",
+       y = "Number of ppl biking to work (log N)",
+       color = "State region")
 
 ```

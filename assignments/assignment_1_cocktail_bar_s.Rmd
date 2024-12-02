@@ -33,6 +33,9 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 
 ```{r}
 
+cocktail_data <- read_tsv("/Users/ferenczboroka/Desktop/R-project/Fall-2024/data/cocktail_data.tsv")
+cocktail_data
+
 ```
 
 ## 2. Transform the data table and clean the ingredient variable!
@@ -40,6 +43,25 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 The ingredients are currently in a single cell for each cocktail. It would be better to put them in separate rows. Also, the variable should be cleaned of all quantities (e.g. 1/2 oz, 2 dashes, etc.), and the indicator of alcohol content (e.g. 47.3% abv). You will need to use this cleaned table in later tasks.
 
 ```{r}
+#separating into rows
+cocktail_data_clean <- cocktail_data %>%
+  mutate(
+    ingredients = str_replace_all(ingredients, "<br>", "<br/>"),
+    ingredients = str_replace_all(ingredients, "<b4/>", "<br/>")  
+  ) %>%
+  separate_rows(ingredients, sep = "<br/>")  # Split into separate rows 
+
+#cleaning the ingredients
+cocktail_data_clean <- cocktail_data_clean %>%
+  mutate(
+    ingredients = str_remove_all(ingredients, "\\d+\\s*\\/?\\d*\\s*(oz|dashes?|drops?|tsp|tbsp|cl|ml|bsp|parts?)"),  # Remove quantities
+    ingredients = str_remove_all(ingredients, "\\(.*?abv\\)"),  # Remove abv
+    ingredients = str_remove_all(ingredients, "\\b\\d+(\\.\\d+)?(?!-)(?=\\s|$)"),  # Remove standalone numbers and decimals (not followed by hyphen)
+    ingredients = str_remove_all(ingredients, "\\d+\\.\\s*"),  # Remove numbers with dot and space
+    ingredients = str_remove_all(ingredients, "\\s*\\.\\s*"),  # Remove standalone dots with spaces around
+    ingredients = str_trim(ingredients)  # Trim whitespace
+  )
+
 
 ```
 
@@ -48,7 +70,15 @@ The ingredients are currently in a single cell for each cocktail. It would be be
 Before opening the bar, you need to find a reliable supplier that has all the ingredients. You need to send a list of all possible ingredients you will need. They don't need the quantities (i.e. how many of these are needed), just the names of the ingredients.
 
 ```{r}
+# Create a sorted list of ingredients
+ingredients_list <- cocktail_data_clean %>%
+  dplyr::select(ingredients) %>%      # dplyr:: to resolve a conflict with another package loaded in my environment
+  distinct() %>%               # Get ingredients
+  arrange(ingredients) %>%     # Sort in alphabetical order
+  pull(ingredients)            # Extract the vector
 
+#print
+ingredients_list
 ```
 
 ## 4. Number of unique ingredients
@@ -56,7 +86,11 @@ Before opening the bar, you need to find a reliable supplier that has all the in
 How many different ingredients you will need?
 
 ```{r}
+#calcualte the number of ingredients
+number_of_ingredients <- length(ingredients_list)
 
+#print
+number_of_ingredients
 ```
 
 ## 5. What are the top 10 ingredients?
@@ -65,6 +99,24 @@ What are the 10 most frequently used ingredients? If there are ties, you can lis
 
 ```{r}
 
+
+# Count the occurrences of each ingredient
+ingredient_counts <- cocktail_data_clean %>%
+  count(ingredients, sort = TRUE)  # Count occurrences, sorted in descending order
+
+
+# Determine the maximum count for the 10th ingredient
+max_count_10th <- ingredient_counts %>%
+  slice(10) %>%  # Get the 10th row
+  pull(n)        # Extract the count value
+
+# Filter to get the top 10 and any ties with the 10th ingredient
+top_ingredients <- ingredient_counts %>%
+  filter(n >= max_count_10th) %>%  # Keep ingredients with count >= count of the 10th
+  arrange(desc(n))                  # Sort by count in descending order
+
+# Print the top ingredients
+top_ingredients
 ```
 
 ## 6. Which cocktail(s) has/have the most ingredients?
@@ -73,24 +125,97 @@ Count the number of ingredients and filter all the cocktails that has that many.
 
 ```{r}
 
+
+# Count the number of ingredients for each cocktail
+cocktail_counts <- cocktail_data_clean %>%
+  group_by(name) %>%  
+  summarise(num_ingredients = n())
+
+# Identify the maximum number of ingredients
+max_ingredients <- max(cocktail_counts$num_ingredients)
+
+# Filter cocktails with the maximum number of ingredients
+cocktails_with_most_ingredients <- cocktail_counts %>%
+  filter(num_ingredients == max_ingredients)
+
+# Print
+cocktails_with_most_ingredients
+
 ```
 
 ## 7. How many ingredients appear in only one cocktail (rare ingredient)?
 
 ```{r}
 
+# Count how many cocktails each ingredient appears in
+ingredient_counts <- cocktail_data_clean %>%
+  group_by(ingredients) %>%  
+  summarise(num_cocktails = n_distinct(name)) 
+
+#  Filter for ingredients that appear in only one cocktail
+rare_ingredients <- ingredient_counts %>%
+  filter(num_cocktails == 1)
+rare_ingredients
+
+#  Count the number of rare ingredients
+num_rare_ingredients <- nrow(rare_ingredients)
+
+# Print
+num_rare_ingredients
 ```
 
 ## 8. Which cocktail has an ingredient that is only used in one cocktail?
 
 ```{r}
 
+#  Create a vector of rare ingredients
+rare_ingredient_list <- rare_ingredients$ingredients
+rare_ingredient_list
+
+# Initialize an empty vector to store cocktail names with rare ingredients
+cocktails_with_rare_ingredients <- c()
+
+# Loop through the rows of cocktail_data_clean to check if any ingredient matches the rare_ingredient_list exactly
+for (i in 1:nrow(cocktail_data_clean)) {
+  # Get the ingredient for the current row
+  ingredient <- cocktail_data_clean$ingredients[i]
+  
+  # Check if the ingredient matches any ingredient in rare_ingredient_list exactly
+  if (ingredient %in% rare_ingredient_list) {
+    # Get the cocktail name for the current row
+    cocktail_name <- cocktail_data_clean$name[i]
+    
+    # Add the cocktail name only if it's not already in the result vector
+    if (!(cocktail_name %in% cocktails_with_rare_ingredients)) {
+      cocktails_with_rare_ingredients <- c(cocktails_with_rare_ingredients, cocktail_name)
+    }
+  }
+}
+
+#cocktails with ingredients that appear only once
+cocktails_with_rare_ingredients
+
+
+#there is a 'saline' and 'simple' string in the ingredients columns- and I don't know if I should've removed those- those  derived from 'saline solution' and 'simple syrup' I guess
 ```
 
 ## 9. What are the cocktails without rare ingredients?
 
 ```{r}
-  
+
+#  Get all cocktail names from the cocktail_data dataframe
+all_cocktails <- cocktail_data$name
+
+#  Find cocktails in the cocktail_data name column that are not in cocktails_with_rare_ingredients
+non_rare_cocktails <- setdiff(all_cocktails, cocktails_with_rare_ingredients)
+
+#  Optionally, filter the cocktail_data dataframe to get the rows for non-rare cocktails
+non_rare_cocktails_data <- cocktail_data %>% 
+  filter(name %in% non_rare_cocktails)
+
+# Print cocktails without rare ingredients
+non_rare_cocktails
+
 ```
 
 ## 10. Create a cheat sheet for the bartender!
@@ -98,6 +223,31 @@ Count the number of ingredients and filter all the cocktails that has that many.
 Create a matrix that shows all cocktail names as rows and all ingredients as columns. When a cocktail requires an ingredient, there should be an "X" in the cell, otherwise, the cell should remain empty. Example:
 
 ```{r}
+# Extracting the unique cocktail names and unique ingredients
+unique_cocktails <- unique(cocktail_data_clean$name)
+unique_ingredients <- ingredient_counts$ingredients
+
+#  Creating an empty cheat sheet dataframe with cocktails as rows and ingredients as columns
+cheat_sheet <- data.frame(matrix(ncol = length(unique_ingredients), nrow = length(unique_cocktails)))
+colnames(cheat_sheet) <- unique_ingredients
+rownames(cheat_sheet) <- unique_cocktails
+
+# Cheat sheet
+for (i in seq_len(nrow(cocktail_data_clean))) {
+  # Get the current cocktail name and ingredient
+  cocktail_for_cheat_sheet <- cocktail_data_clean$name[i]
+  ingredient_for_cheat_sheet <- cocktail_data_clean$ingredients[i]
+  
+  # If the ingredient is in the unique_ingredients list, mark 'x' in the corresponding cell
+  if (ingredient_for_cheat_sheet %in% unique_ingredients) {
+    cheat_sheet[cocktail_for_cheat_sheet, ingredient_for_cheat_sheet] <- "x"
+  }
+}
+
+# Replacing NAs with empty strings for better readability
+cheat_sheet[is.na(cheat_sheet)] <- ""
+
+cheat_sheet
 
 ```
 

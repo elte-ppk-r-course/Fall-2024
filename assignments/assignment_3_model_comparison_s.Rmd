@@ -54,11 +54,20 @@ In your discussion of the findings, briefly interpret the results of the above a
 
 # Solution
 
+```{r libraries}
+library(tidyverse)
+library(lmtest)
+library(car)
+
+```
+
 ## Read the data
 
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
 
 ```{r}
+#reading the excel file
+dataset<- readxl::read_excel("/Users/ferenczboroka/Desktop/R-project/Fall-2024/data/assignment_3_dataset_.xlsx")
 
 ```
 
@@ -70,6 +79,26 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
 
+#summary
+summary(dataset)
+
+#checking  missing values
+colSums(is.na(dataset))
+
+#checking correlations
+cor_matrix <- cor(dataset[, c("pain", "age", "STAI_trait", "pain_cat", "cortisol_serum", "cortisol_saliva", "mindfulness")], use = "complete.obs")
+print(cor_matrix)
+
+#checking the sex variable
+table(dataset$sex)
+
+#checking the ranges
+range(dataset$STAI_trait)
+range(dataset$pain_cat)
+range(dataset$mindfulness)
+range(dataset$cortisol_saliva)
+range(dataset$cortisol_serum)
+
 ```
 
 #### Correct coding errors
@@ -77,6 +106,27 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+
+# Recode the 'sex' variable
+dataset <- dataset %>%
+  mutate(sex = ifelse(sex == "woman", "female", sex))
+
+# Check the unique values to confirm
+unique(dataset$sex)
+
+#filtering between the given ranges- pain
+filtered_data <- dataset %>%
+  filter(pain >= 1 & pain <= 10)
+
+# Check the filtered data
+summary(filtered_data$pain)
+
+#filtering between the given ranges- mindfulness
+final_dataset <- filtered_data %>%
+  filter(mindfulness >= 1 & mindfulness <= 6)
+
+# Check the filtered data
+summary(final_dataset$mindfulness)
 
 ```
 
@@ -87,6 +137,10 @@ In order to test the more complex model for outliers and to test the assumptions
 
 ```{r}
 
+# Complex model with multiple predictors
+model_complex <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva + cortisol_serum, data = final_dataset)
+summary(model_complex)
+
 ```
 
 #### Checking for influential outliers
@@ -94,6 +148,23 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+
+# Check for influential points using Cook's distance
+cooks_d <- cooks.distance(model_complex)
+
+# Visualize Cook's Distance
+cooks_data <- data.frame(Observation = 1:length(cooks_d), Cooks_Distance = cooks_d)
+ggplot(cooks_data, aes(x = Observation, y = Cooks_Distance)) +
+  geom_point() +
+  geom_hline(yintercept = 4 / length(cooks_d), color = "red", linetype = "dashed") +
+  labs(title = "Cook's Distance for Influential Observations",
+       x = "Observation",
+       y = "Cook's Distance") +
+  theme_minimal()
+
+# Identify observations with Cook's distance greater than 4/n
+influentials <- which(cooks_d > (4 / nrow(final_dataset)))
+influentials
 
 ```
 
@@ -103,17 +174,46 @@ Check the normality assumption.
 
 ```{r}
 
+# Calculate residuals
+residuals_model <- residuals(model_complex)
+
+# Plot histogram
+ggplot(data.frame(residuals = residuals_model), aes(x = residuals)) +
+  geom_histogram(binwidth = 0.5, color = "black", fill = "blue", alpha = 0.7) +
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Frequency") +
+  theme_minimal()
+
+# Shapiro-Wilk normality test
+shapiro.test(residuals_model)
+
 ```
 
 Check the linearity assumption.
 
 ```{r}
+# Get the fitted values
+fitted_values <- fitted(model_complex)
+
+# Create a data frame for ggplot
+residuals_vs_fitted_df <- data.frame(fitted_values, residuals = residuals(model_complex))
+
+# Residuals vs Fitted plot
+ggplot(residuals_vs_fitted_df, aes(x = fitted_values, y = residuals)) +
+  geom_point(color = "skyblue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  
+  labs(title = "Residuals vs Fitted Values-ordinal", x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
 
 ```
+
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
+
+# Breusch-Pagan Test for homoscedasticity
+bptest(model_complex)
 
 ```
 
@@ -127,6 +227,12 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 
 ```{r}
 
+# Calculate and check the VIF for the complex model
+vif_values <- vif(model_complex)
+
+# Print VIF values
+print(vif_values)
+
 ```
 
 ### Making decision based on model diagnostics
@@ -135,11 +241,34 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 
 ```{r}
 
+#I decided to keep influential outliers because they might be important to understand in this context
+# Complex model without cortisol serum
+new_model_complex <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = final_dataset)
+summary(new_model_complex)
+
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+
+# Calculate Cook's distance
+cooks_d2 <- cooks.distance(new_model_complex)
+
+# Visualize Cook's distance
+cooks_data2 <- data.frame(Observation2 = 1:length(cooks_d2), Cooks_Distance2 = cooks_d2)
+ggplot(cooks_data2, aes(x = Observation2, y = Cooks_Distance2)) +
+  geom_point() +
+  geom_hline(yintercept = 4 / length(cooks_d2), color = "red", linetype = "dashed") +
+  labs(title = "Cook's Distance for Influential Observations",
+       x = "Observation",
+       y = "Cook's Distance") +
+  theme_minimal()
+
+# Identify observations with Cook's distance greater than 4/n 
+influentials2 <- which(cooks_d2 > (4 / nrow(final_dataset)))
+influentials
+
 
 ```
 
@@ -148,12 +277,35 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 Normality assumption
 
 ```{r}
+# Calculate residuals
+residuals_model2 <- residuals(new_model_complex)
 
+# Plot histogram
+ggplot(data.frame(residuals2 = residuals_model2), aes(x = residuals2)) +
+  geom_histogram(binwidth = 0.5, color = "black", fill = "blue", alpha = 0.7) +
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Frequency") +
+  theme_minimal()
+
+# Shapiro-Wilk normality test
+shapiro.test(residuals_model2)
 ```
 
 Linearity assumption
 
 ```{r}
+
+# Get the fitted  values
+fitted_values2 <- fitted(new_model_complex)
+
+# Create a data frame for ggplot
+residuals_vs_fitted_df2 <- data.frame(fitted_values2, residuals2 = residuals(new_model_complex))
+
+# Residuals vs Fitted plot using ggplot2
+ggplot(residuals_vs_fitted_df2, aes(x = fitted_values2, y = residuals2)) +
+  geom_point(color = "skyblue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  
+  labs(title = "Residuals vs Fitted Values-ordinal", x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
 
 ```
 
@@ -161,11 +313,20 @@ Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
 
+# Breusch-Pagan Test for homoscedasticity for new model
+bptest(new_model_complex)
+
 ```
 
 Multicollinearity assumption
 
 ```{r}
+
+# Calculating and checking the VIF for the new complex model
+vif_values <- vif(new_model_complex)
+
+# Print VIF values
+print(vif_values)
 
 ```
 
@@ -175,11 +336,73 @@ Create the simple model and get the results of the model that needs to be report
 
 ```{r}
 
+# Simple model with age and sex
+model_simple <- lm(pain ~ age + sex, data = final_dataset)
+summary(model_simple)
+
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+
+# Final-complex  model with multiple predictors wthout cortisol_serum
+final_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = final_dataset)
+summary(final_model)
+
+```
+
+Writing everything into tables.
+
+```{r}
+
+# Get summaries of the models
+summary_simple <- summary(model_simple)
+summary_final <- summary(final_model)
+
+
+# Extract test statistics (Adj R², F, df, p-value)
+extract_stats <- function(model_summary) {
+  adj_r2 <- model_summary$adj.r.squared
+  f_stat <- model_summary$fstatistic[1]
+  df1 <- model_summary$fstatistic[2]
+  df2 <- model_summary$fstatistic[3]
+  p_value <- pf(f_stat, df1, df2, lower.tail = FALSE)
+  return(c(adj_r2, f_stat, df1, df2, p_value))
+}
+
+# Extract statistics for both models
+stats_simple <- extract_stats(summary_simple)
+stats_final <- extract_stats(summary_final)
+
+# Create model comparison table
+model_comparison <- data.frame(
+  Model = c("Simple Model", "Final Model"),
+  Adjusted_R2 = c(stats_simple[1], stats_final[1]),
+  F_statistic = c(stats_simple[2], stats_final[2]),
+  DF1 = c(stats_simple[3], stats_final[3]),
+  DF2 = c(stats_simple[4], stats_final[4]),
+  P_value_F = c(stats_simple[5], stats_final[5])
+)
+
+# Extract coefficients for both models
+coefs_simple <- summary_simple$coefficients
+coefs_final <- summary_final$coefficients
+
+# Create coefficient table
+coeff_table <- data.frame(
+  Predictor = rownames(coefs_final),
+  Unstd_Coeff_Simple = c(coefs_simple[,"Estimate"], rep(NA, nrow(coefs_final) - nrow(coefs_simple))),
+  Unstd_Coeff_Final = coefs_final[,"Estimate"],
+  P_value_Simple = c(coefs_simple[,"Pr(>|t|)"], rep(NA, nrow(coefs_final) - nrow(coefs_simple))),
+  P_value_Final = coefs_final[,"Pr(>|t|)"]
+)
+
+# Print model comparison table
+print(model_comparison)
+
+# Print coefficient table
+print(coeff_table)
 
 ```
 
@@ -187,5 +410,34 @@ Compare the two models.
 
 ```{r}
 
+# Calculate AIC for the simple model
+aic_simple <- AIC(model_simple)
+
+# Calculate AIC for the final complex model
+aic_final <- AIC(final_model)
+
+# Print the AIC values for both models
+print(paste("AIC for simple model:", aic_simple))
+print(paste("AIC for final model:", aic_final))
+
+#comparing
+if (aic_simple < aic_final) {
+  print("The simple model has a better AIC (lower is better).")
+} else {
+  print("The final model has a better AIC (lower is better).")
+}
+
 ```
 
+
+## Reporting the regression equation for the complex (final) model
+ 
+### pain = 1.26405585 -0.01983310 * age + 0.31755483 * sex - 0.02994738 * STAI_trait + 0.09811980 * pain_cat - -0.11636089 * mindfulness + 0.59682923 * cortisol_saliva
+
+## Discussion
+
+#### To assess the impact of psychological and hormonal factors on perceived pain, we compared two regression models: a simple model with age and sex as predictors, and a more complex model including additional predictors such as state anxiety (STAI_trait), pain catastrophizing (Pain_cat), mindfulness, and cortisol in saliva (Cortisol_Saliva).
+
+#### The simple model explained a small proportion of variance in pain (Radj²=0.0685), with a significant F-statistic (𝐹(2,155)=6.78, 𝑝<.001. The more complex model, however, accounted for a larger proportion of variance in pain ( and significantly improved the model fit (Radj² =0.32, F(6,151)= 13.52, p<.001 ).
+
+#### These results suggest that the inclusion of psychological and hormonal measures, such as state anxiety, pain catastrophizing, mindfulness, and cortisol level, provides a better understanding of the factors influencing perceived pain, beyond just age and sex. The complex model explained an additional 31% of the variance in pain, supporting the utility of these additional variables in predicting perceived pain.
