@@ -1,6 +1,7 @@
 ---
 title: "Assignment 3: Model comparison"
-author: "Marton Kovacs"
+author: "Donát Keszthelyi"
+date: 30/11/2024
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -59,7 +60,21 @@ In your discussion of the findings, briefly interpret the results of the above a
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
 
 ```{r}
+#Importing libraries
+library(tidyverse)
+library(readxl)
+library(here)
+library(broom)
+library(moderndive)
+library(car)
+library(lmtest)
+library(lm.beta)
 
+#Setting the relative path for the data file
+data_path <- here("", "data/assignment_3_dataset_.xlsx")
+
+#Reading the data
+data_raw <- read_excel(data_path)
 ```
 
 ## Data and model diagnostics 
@@ -69,7 +84,35 @@ Read the dataset used in this assignment. Pay attention to the extension of the 
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+#Basic structure and dimensions of the data
+str(data_raw)
+dim(data_raw)
+unique_counts <- data_raw |>
+  summarise(across(everything(), n_distinct))
+print(unique_counts)
 
+#First and last few rows
+head(data_raw)
+tail(data_raw)
+
+#Checking for missing data
+sum(is.na(data_raw))
+
+#Summary statistics
+summary(data_raw)
+
+#Histograms for raw data visualisation
+data_raw |> select(where(is.numeric)) |>
+  gather(key = "Variable", value = "Value") |>
+  ggplot(aes(x = Value)) +
+  geom_histogram(bins = 30) +
+  facet_wrap(~Variable, scales = "free") +
+  theme_minimal()
+
+ggplot(data_raw, aes(x = sex)) +
+  geom_bar() +
+  labs(title = "sex", x = "Gender", y = "count") +
+  theme_minimal()
 ```
 
 #### Correct coding errors
@@ -77,7 +120,24 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+#Defining variable limits for the pain scale and the questionnaires
+limits <- list(
+  pain = c(0, 10),
+  STAI_trait = c(20, 80),
+  pain_cat = c(0, 52),
+  mindfulness = c(1, 6)
+)
 
+#Correcting erroneous coding and excluding erroneous cases
+data_clean <- data_raw |>
+  mutate(sex = ifelse(sex == "woman", "female", sex)) |>
+  filter(if_all(
+    .cols = names(limits),
+    .fns = ~ . >= limits[[deparse(substitute(.))]][1] & . <= limits[[deparse(substitute(.))]][2]
+  ))
+
+#Changing the sex variable to a factor
+data_clean$sex <- as.factor(data_clean$sex)
 ```
 
 ### Model diagnostics
@@ -86,7 +146,14 @@ If you find values in the dataset during the EDA, that are not correct based on 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
+#Creating the complex model
+complex_model <- lm(
+  pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva,
+  data = data_clean
+)
 
+#Summary for the complex model
+summary(complex_model)
 ```
 
 #### Checking for influential outliers
@@ -94,7 +161,33 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+#Augmenting the complex model
+complex_model_augmented <- complex_model |>
+  augment() |>
+  mutate(ID = row_number())
 
+#Setting the Cook's threshold
+complex_cooks_threshold <- 4 / nrow(complex_model_augmented)
+
+#Getting the influential observations based on the Cook's distance
+complex_influential_points <- complex_model_augmented |>
+  filter(.cooksd > complex_cooks_threshold)
+complex_influential_points
+
+#Plotting the complex model, highlighting the influential observations
+ggplot(data = complex_model_augmented, aes(x = .fitted, y = pain)) +
+  geom_point(color = "orange", shape = 21, fill = "yellow") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  geom_point(
+    data = complex_influential_points, aes(x = .fitted, y = pain), 
+    color = "black", shape = 21, fill = "purple"
+  ) + 
+  labs(
+    title = "Regression plot fot the COMPLEX MODEL with highlighted influential observations",
+    x = "Fitted Values",
+    y = "Pain"
+  ) +
+  theme_minimal()
 ```
 
 #### Checking assumptions
@@ -102,19 +195,35 @@ Check for outlier values in the model.
 Check the normality assumption.
 
 ```{r}
+#Getting the residuals for the complex model
+complex_model_residuals <- complex_model_augmented$.resid
 
+#Shapiro-Wilk test for normality check
+shapiro.test(complex_model_residuals)
+
+#Normal Q-Q plot for the complex model
+qqnorm(complex_model_residuals, main = "Normal Q-Q plot for the COMPLEX MODEL residuals")
+
+#Histogram for the complex model
+hist(complex_model_residuals, probability = TRUE, main = "Histogram of the COMPLEX MODEL residuals")
+curve(dnorm(x, mean = mean(complex_model_residuals), sd = sd(complex_model_residuals)), add = TRUE)
 ```
 
 Check the linearity assumption.
 
 ```{r}
+#RESET test for linearity check
+resettest(complex_model, power = 2:3)
 
+#Ceres residual plots
+ceresPlots(complex_model)
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
-
+#Breusch-Pagan test for homoscedasticty check
+bptest(complex_model)
 ```
 
 Check the multicollinearity assumption.
@@ -126,7 +235,8 @@ https://statisticalhorizons.com/multicollinearity
 http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis
 
 ```{r}
-
+#Variance Inflation Factors for multicollinearity check
+vif(complex_model)
 ```
 
 ### Making decision based on model diagnostics
@@ -134,13 +244,46 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
+#Updating the model by dropping the cortisol_saliva variable as predictor
+updated_model <- lm(
+  pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum,
+  data = data_clean
+)
 
+#Summary for the updated model
+summary(updated_model)
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+#Augmenting the updated model
+updated_model_augmented <- updated_model |>
+  augment() |>
+  mutate(ID = row_number())
 
+#Setting the Cook's threshold
+updated_cooks_threshold <- 4 / nrow(updated_model_augmented)
+
+#Getting the influential observations based on the Cook's distance
+updated_influential_points <- updated_model_augmented |>
+  filter(.cooksd > updated_cooks_threshold)
+updated_influential_points
+
+#Plotting the updated model, highlighting the influential observations
+ggplot(data = updated_model_augmented, aes(x = .fitted, y = pain)) +
+  geom_point(color = "orange", shape = 21, fill = "yellow") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  geom_point(
+    data = updated_influential_points, aes(x = .fitted, y = pain), 
+    color = "black", shape = 21, fill = "purple"
+  ) + 
+  labs(
+    title = "Regression plot fot the UPDATED MODEL with highlighted influential observations",
+    x = "Fitted Values",
+    y = "Pain"
+  ) +
+  theme_minimal()
 ```
 
 #### Checking assumptions of the updated model
@@ -148,25 +291,43 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 Normality assumption
 
 ```{r}
+#Getting the residuals for the updated model
+updated_model_residuals <- updated_model_augmented$.resid
+
+#Shapiro-Wilk test for normality check of the updated model residuals
+shapiro.test(updated_model_residuals)
+
+#Normal Q-Q plot for the updated model residuals
+qqnorm(updated_model_residuals, main = "Normal Q-Q plot for the UPDATED MODEL residuals")
+
+#Histogram for the updated model residuals
+hist(updated_model_residuals, probability = TRUE, main = "Histogram of the UPDATED MODEL residuals")
+curve(dnorm(x, mean = mean(updated_model_residuals), sd = sd(updated_model_residuals)), add = TRUE)
 
 ```
 
 Linearity assumption
 
 ```{r}
+#RESET test for linearity check
+resettest(updated_model, power = 2:3)
 
+#Ceres residual plots
+ceresPlots(updated_model)
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
-
+#Breusch-Pagan test for homoscedasticity check
+bptest(updated_model)
 ```
 
 Multicollinearity assumption
 
 ```{r}
-
+#Variance Inflation Factors for multicollinearity check
+vif(updated_model)
 ```
 
 ## Model comparison
@@ -174,18 +335,205 @@ Multicollinearity assumption
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
+#Creating the simple model
+simple_model <- lm(
+  pain ~ age + sex,
+  data = data_clean
+)
 
+#Extracting all the values needed for reporting and for the model comparison
+simple_model_adj_r2 <- summary(simple_model)$adj.r.squared
+simple_model_f_stat <- summary(simple_model)$fstatistic
+simple_model_f_stat_value <- simple_model_f_stat[1]
+simple_model_df <- summary(simple_model)$df
+simple_model_f_stat_pvalue <- pf(simple_model_f_stat_value, simple_model_f_stat[2], simple_model_f_stat[3], lower.tail = FALSE)
+simple_model_aic <- AIC(simple_model)
+simple_model_coefs <- tidy(simple_model)
+simple_model_stats <- tidy(simple_model) |>
+  mutate(
+    conf.low = confint(simple_model)[, 1],
+    conf.high = confint(simple_model)[, 2]
+  )
+simple_std_coefs <- lm.beta(simple_model)
+simple_model_stats$standardized_beta <- simple_std_coefs$standardized.coefficients
+
+#Renaming the columns in the coefficient table for a nicer look
+simple_model_stats <- simple_model_stats %>%
+  select(
+    term, estimate, std.error, statistic, p.value, conf.low, conf.high, standardized_beta
+  ) %>%
+  rename(
+    Unstandardized_B = estimate,
+    Std_Error = std.error,
+    t_statistic = statistic,
+    p_value = p.value,
+    Conf_Low = conf.low,
+    Conf_High = conf.high,
+    Standardized_Beta = standardized_beta
+  )
 ```
+
+## Simple Model Report
+
+__Simple Model Adjusted R²:__ 0.069
+
+__Simple Model F-statistic:__ 6.777
+
+__Simple Model F-statistic p-value:__ 0.0015082
+
+__Simple Model Degrees of Freedom (df):__ 3 (Model), 155 (Residuals)
+
+__Simple Model Coefficients:__
+
+| **Term**          | **Unstandardized B** | **Std Error** | **t-statistic** | **p-value** | **Conf Low** | **Conf High** | **Standardized Beta** |
+|-------------------|----------------------|---------------|-----------------|-------------|--------------|---------------|-----------------------|
+| *(Intercept)*     | 8.31                 | 0.952         | 8.73            | 3.85e-15    | 6.43         | 10.2          | NA                    |
+| *age*             | -0.0845              | 0.0231        | -3.65           | 3.55e-4     | -0.130       | -0.0388       | -0.281                |
+| *sex(male)*       | 0.131                | 0.232         | 0.565           | 5.73e-1     | -0.328       | 0.590         | 0.0435                |
+
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+#Creating the final complex model (which is identical to the updated model from before)
+final_complex_model <- lm(
+  pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum,
+  data = data_clean
+)
 
+#Extracting all the values needed for reporting and for the model comparison
+final_complex_model_adj_r2 <- summary(final_complex_model)$adj.r.squared
+final_complex_model_f_stat <- summary(final_complex_model)$fstatistic
+final_complex_model_f_stat_value <- final_complex_model_f_stat[1]
+final_complex_model_df <- summary(final_complex_model)$df
+final_complex_model_f_stat_pvalue <- pf(final_complex_model_f_stat_value, final_complex_model_f_stat[2], final_complex_model_f_stat[3], lower.tail = FALSE)
+final_complex_model_aic <- AIC(final_complex_model)
+final_complex_model_coefs <- tidy(final_complex_model)
+final_complex_model_stats <- tidy(final_complex_model) |>
+  mutate(
+    conf.low = confint(final_complex_model)[, 1],
+    conf.high = confint(final_complex_model)[, 2]
+  )
+final_complex_std_coefs <- lm.beta(final_complex_model)
+final_complex_model_stats$standardized_beta <- final_complex_std_coefs$standardized.coefficients
+
+#Renaming the columns in the coefficient table for a nicer look
+final_complex_model_stats <- final_complex_model_stats %>%
+  select(
+    term, estimate, std.error, statistic, p.value, conf.low, conf.high, standardized_beta
+  ) %>%
+  rename(
+    Unstandardized_B = estimate,
+    Std_Error = std.error,
+    t_statistic = statistic,
+    p_value = p.value,
+    Conf_Low = conf.low,
+    Conf_High = conf.high,
+    Standardized_Beta = standardized_beta
+  )
 ```
+
+## Final Complex Model Report
+
+__Final Complex Model Adjusted R²:__ 0.312
+
+__Final Complex Model F-statistic:__ 12.854
+
+__Final Complex Model F-statistic p-value:__ 1.0543e-11
+
+__Final Complex Model Degrees of Freedom (df):__ 7 (Model), 151 (Residuals)
+
+__Final Complex Model Coefficients:__
+
+| **Term**             | **Unstandardized B** | **Std Error** | **t-statistic** | **p-value** | **Conf Low** | **Conf High** | **Standardized Beta** |
+|----------------------|----------------------|---------------|-----------------|-------------|--------------|---------------|-----------------------|
+| *(Intercept)*        | 1.94                 | 1.70          | 1.14            | 0.255       | -1.42        | 5.31          | NA                    |
+| *age*                | -0.0340              | 0.0236        | -1.44           | 0.151       | -0.0806      | 0.0126        | -0.113                |
+| *sex(male)*          | 0.316                | 0.213         | 1.48            | 0.140       | -0.104       | 0.736         | 0.105                 |
+| *STAI_trait*         | -0.0132              | 0.0271        | -0.488          | 0.626       | -0.0668      | 0.0403        | -0.0443               |
+| *pain_cat*           | 0.0834               | 0.0285        | 2.93            | 0.00396     | 0.0271       | 0.140         | 0.257                 |
+| *mindfulness*        | -0.136               | 0.127         | -1.08           | 0.284       | -0.386       | 0.114         | -0.0860               |
+| *cortisol_serum*     | 0.543                | 0.125         | 4.35            | 0.0000249   | 0.297        | 0.790         | 0.357                 |
+
+
+__Final Complex Model's Regression Equation:__
+
+Pain =  1.94  +  -0.03 * age  +  0.32 * sex(male)  +  -0.01 * STAI_trait  +  0.08 * pain_catastrophizing  +  -0.14 * mindfulness  +  0.54 * cortisol_serum
 
 Compare the two models.
 
 ```{r}
+#Comparing adjusted R²
+print(paste("Simple Model Adjusted R²:", round(simple_model_adj_r2, 3)))
+print(paste("Final Complex Model Adjusted R²:", round(final_complex_model_adj_r2, 3)))
 
+#Comparing F-statistic and its p-value
+print(paste("Simple Model F-statistic:", round(simple_model_f_stat_value, 3)))
+print(paste("Simple Model F-statistic p-value:", format.pval(simple_model_f_stat_pvalue)))
+print(paste("Final Complex Model F-statistic:", round(final_complex_model_f_stat_value, 3)))
+print(paste("Final Complex Model F-statistic p-value:", format.pval(final_complex_model_f_stat_pvalue)))
+
+#Degrees of freedom comparison
+print(paste("Simple Model Degrees of Freedom (df):", simple_model_df[1], "(Model),", simple_model_df[2], "(Residuals)"))
+print(paste("Final Complex Model Degrees of Freedom (df):", final_complex_model_df[1], "(Model),", final_complex_model_df[2], "(Residuals)"))
+
+#Comparing coefficients
+print("Simple Model Coefficients:")
+print(simple_model_stats)
+print("Final Complex Model Coefficients")
+print(final_complex_model_stats)
+
+#Extracting coefficients for the regression equation
+final_complex_model_coefficients <- coef(final_complex_model)
+intercept <- final_complex_model_coefficients[1]
+age_coeff <- final_complex_model_coefficients["age"]
+sex_coeff <- final_complex_model_coefficients["sexmale"]
+stai_coeff <- final_complex_model_coefficients["STAI_trait"]
+pain_cat_coeff <- final_complex_model_coefficients["pain_cat"]
+mindfulness_coeff <- final_complex_model_coefficients["mindfulness"]
+cortisol_serum_coeff <- final_complex_model_coefficients["cortisol_serum"]
+
+#Writing out the regression equation
+regression_eqn <- paste(
+  "Pain = ", round(intercept, 2), 
+  " + ", round(age_coeff, 2), "* age",
+  " + ", round(sex_coeff, 2), "* sex(male)",
+  " + ", round(stai_coeff, 2), "* STAI_trait",
+  " + ", round(pain_cat_coeff, 2), "* pain_catastrophizing",
+  " + ", round(mindfulness_coeff, 2), "* mindfulness",
+  " + ", round(cortisol_serum_coeff, 2), "* cortisol_serum"
+)
+print("Final Complex Model's Regression Equation:")
+print(regression_eqn)
+
+#Comparing AIC values
+print(paste("Simple Model AIC:", round(simple_model_aic, 2)))
+print(paste("Final Complex Model AIC:", round(final_complex_model_aic, 2)))
+
+#Likelihood ratio test
+lr_test <- anova(simple_model, final_complex_model)
+print("Likelihood Ratio Test:")
+print(lr_test)
 ```
 
+## Comparing the Two Models
+
+### AIC Comparison:
+
+__Simple Model AIC:__ 572.48
+
+__Final Complex Model AIC:__ 528.53
+
+*The Final Complex Model has a lower AIC value, meaning it is a better fitting model relative to its complexity.*
+
+### Likelihood Ratio Test:
+
+__LTR F-statistic:__ 14.695
+
+__LTR p-value:__ 3.673e-10
+
+*The p-value is <0.05, therefore the Final Complex Model has a significantly improved fit compared to the Simple Model.*
+
+## Discussion
+
+After the initial exploratory analysis, I corrected one observation's coding for the 'sex' variable from 'woman' to 'female'. I excluded two observations due to erroneous coding (containing values, which exceeded the limits of the administered tests). For the remaining 158 observations, I created a complex linear regression model. Since the two variables for the cortisol levels ('cortisol_serum' and 'cortisol_saliva') both had an >5 variance inflation factor (VIF), I dropped the 'cortisol_saliva' variable from the complex model. I also created a simple model, with only two predictors. The two models passed all of the assumption checks. When comparing the two hierarchical models, the complex model (with 6 predictors) showed a better fit, hence the inlcusion of the psychological and hormonal measures resulted in a better model. This means, that can make better predictions and projections if we include them in our regression model.
