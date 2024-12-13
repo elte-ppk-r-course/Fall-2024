@@ -1,3 +1,6 @@
+
+
+
 ---
 title: "Assignment 1: The cocktail bar (data transformation and manipulation)"
 author: "Tamas Nagy"
@@ -17,6 +20,10 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
 ```
 
 # Background
@@ -33,6 +40,10 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 
 ```{r}
 
+dataset_url <- "https://raw.githubusercontent.com/nthun/cocktail-balance/master/cocktail_data.tsv"
+
+cocktail_dataset <- read.delim(dataset_url)
+
 ```
 
 ## 2. Transform the data table and clean the ingredient variable!
@@ -40,14 +51,18 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 The ingredients are currently in a single cell for each cocktail. It would be better to put them in separate rows. Also, the variable should be cleaned of all quantities (e.g. 1/2 oz, 2 dashes, etc.), and the indicator of alcohol content (e.g. 47.3% abv). You will need to use this cleaned table in later tasks.
 
 ```{r}
+cocktailbar <- cocktail_dataset %>%
+  separate_rows(ingredients, sep = "<br/>|<br>|<b4/>") 
 
+cocktailbar$ingredients <- gsub('[0-9.]|oz|%abv|abv|\\(|\\)|/|%|dash|dashes|drops|bsp', '', cocktailbar$ingredients)
+cocktailbar$ingredients <- trimws(cocktailbar$ingredients)
 ```
-
 ## 3. All ingredients in alphabetical order
 
 Before opening the bar, you need to find a reliable supplier that has all the ingredients. You need to send a list of all possible ingredients you will need. They don't need the quantities (i.e. how many of these are needed), just the names of the ingredients.
 
 ```{r}
+cocktailbar <- cocktailbar %>% arrange(ingredients)
 
 ```
 
@@ -56,7 +71,9 @@ Before opening the bar, you need to find a reliable supplier that has all the in
 How many different ingredients you will need?
 
 ```{r}
-
+unique_ingredients <- cocktailbar %>%
+    count(ingredients, sort = TRUE)
+print (unique_ingredients)
 ```
 
 ## 5. What are the top 10 ingredients?
@@ -64,7 +81,8 @@ How many different ingredients you will need?
 What are the 10 most frequently used ingredients? If there are ties, you can list more than 10.
 
 ```{r}
-
+top10_ingredients <- mutate(unique_ingredients, rank = dense_rank(desc(n))) %>% filter(rank <= 10)                        
+print(top10_ingredients)
 ```
 
 ## 6. Which cocktail(s) has/have the most ingredients?
@@ -72,24 +90,50 @@ What are the 10 most frequently used ingredients? If there are ties, you can lis
 Count the number of ingredients and filter all the cocktails that has that many.
 
 ```{r}
+ingredient_counts <- cocktailbar %>%
+    group_by(name) %>%                 
+    summarise(ingredient_count = n_distinct(ingredients))  
 
+max_ingredients <- max(ingredient_counts$ingredient_count)
+
+cocktails_with_max_ingredients <- cocktailbar %>%
+    group_by(name) %>%
+    summarise(ingredient_count = n_distinct(ingredients)) %>%
+    filter(ingredient_count == max_ingredients)  
+
+print(cocktails_with_max_ingredients)
 ```
 
 ## 7. How many ingredients appear in only one cocktail (rare ingredient)?
 
 ```{r}
+rare_ingredients <- cocktailbar %>%
+    group_by(ingredients) %>%                   
+    summarise(cocktail_count = n_distinct((name))) %>%  
+    filter(cocktail_count == 1) %>%              
+ pull(ingredients)                                   
+
+print(rare_ingredients)
+
 
 ```
 
 ## 8. Which cocktail has an ingredient that is only used in one cocktail?
 
 ```{r}
-
+cocktails_with_rare_ingredients <- cocktailbar %>%
+    filter(ingredients %in% rare_ingredients) %>%  
+    distinct(name) 
+print(cocktails_with_rare_ingredients)
 ```
 
 ## 9. What are the cocktails without rare ingredients?
 
 ```{r}
+cocktails_without_rare_ingredients <- cocktailbar %>%
+    filter(!ingredients %in% rare_ingredients) %>%  
+    distinct(name)  
+print(cocktails_without_rare_ingredients)
   
 ```
 
@@ -98,7 +142,11 @@ Count the number of ingredients and filter all the cocktails that has that many.
 Create a matrix that shows all cocktail names as rows and all ingredients as columns. When a cocktail requires an ingredient, there should be an "X" in the cell, otherwise, the cell should remain empty. Example:
 
 ```{r}
-
+cheat_sheet <- cocktailbar %>%
+    mutate(value = "X") %>%  
+    distinct(name, ingredients, value) %>%  
+    pivot_wider(names_from = ingredients, values_from = value, values_fill = list(value = "")) 
+print(cheat_sheet)
 ```
 
 

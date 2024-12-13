@@ -18,8 +18,12 @@ You will have to create 3 plots based on the datasets and instructions detailed 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(RColorBrewer)
 library(tidyverse)
 library(tidytuesdayR)
+library(dplyr)   
+library(tidyr)
+
 ```
 
 ## Task 1: Climbing expeditions
@@ -31,6 +35,34 @@ The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the thre
 -   The bar colors use the viridis palette and light theme.
 
 ```{r}
+tuesday_data <- tt_load("2020-09-22")
+expeditions <- tuesday_data$expeditions
+
+head(expeditions)
+
+#  forcats::fct_lump() to get the 15 most frequent peaks, the rest - 'Other'
+expeditions$peak_name <- forcats::fct_lump(expeditions$peak_name, n = 15)
+
+# count of expeditions for each peak
+expeditions <- expeditions %>% filter (peak_name != "Other")
+
+sum(is.na(expeditions))
+
+expeditions$peak_name <- forcats::fct_reorder(expeditions$peak_name, expeditions$year, sum)
+
+# Create the plot 
+library(viridis) 
+ggplot(expeditions, aes(x = peak_name, fill = season)) + 
+  geom_bar() +  
+  scale_fill_viridis(discrete = TRUE) +  
+  labs(
+    title = "Top 15 Most Frequent Peaks in Climbing Expeditions", 
+    x = "Peak",
+    y = "Number of Expeditions"
+  ) + 
+  coord_flip()  
+theme_light ()
+theme (legend.position = "bottom")
 
 ```
 
@@ -45,6 +77,36 @@ Notes:
 -   The line size is 1.2, the colors are from the brewer "Dark2" palette. The theme is set to minimal.
 
 ```{r}
+# Load necessary libraries
+
+library(scales)   
+library(RColorBrewer) 
+
+# Load the dataset
+tuesday_data <- tt_load("2019-02-19")
+phd_by_field <- tuesday_data$phd_by_field
+
+# Check the structure of the data
+head(phd_by_field)
+
+# Aggregate the data by broad fields (sum PhDs awarded)
+phd_aggregated <- phd_by_field %>%
+  group_by(year, broad_field) %>%
+  summarise(total_phds = sum(n_phds, na.rm = TRUE), .groups = 'drop')
+
+# Create the plot using ggplot2
+ggplot(phd_aggregated, aes(x = year, y = total_phds, color = broad_field, group = broad_field)) +
+  geom_line(linewidth = 1.2) +  
+  scale_color_brewer(palette = "Dark2") +  
+  scale_x_continuous(breaks = pretty_breaks()) +  
+  scale_y_continuous(labels = comma_format()) +  
+
+  theme_minimal(base_size = 14) + 
+  labs(
+    title = "PhDs Awarded by Broad Field Over Time", 
+    x = "Year", 
+    y = "Number of PhDs Awarded"
+  )  
 
 ```
 
@@ -57,7 +119,33 @@ Notes:
 -   First you have to aggregate the data to count all commutes by state.
 -   Both axis scales are log transformed and the labels comma formatted, using `scales::comma_format()`
 -   The point size is 2, . The theme is set to light.
-
 ```{r}
+# Load the dataset.
+tuesday_data <- tt_load("2019-11-05")
+commute <- tuesday_data$commute
 
+# Filter the data to include only Bike and Walk modes
+commute_filtered <- commute %>%
+  filter(mode %in% c("Bike", "Walk"))
+
+# Reshape the data: Create separate columns for Bike and Walk commute counts
+commute_reshaped <- commute_filtered %>%
+  group_by(state, mode, state_abb,state_region) %>%
+  summarise(total_commutes = sum(n, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = mode, values_from = total_commutes, values_fill = 0) 
+
+
+# Create the scatter plot
+ggplot(commute_reshaped, aes(x = Walk, y = Bike, color = state_region)) +
+  geom_point(size = 2) +             
+  scale_x_log10(labels = comma_format()) +             
+  scale_y_log10(labels = comma_format()) + 
+  geom_text(aes(label = state_abb), size = 3, check_overlap = TRUE, color = "black") +
+  theme_light() +                        
+  labs(
+    title = "Number of people walking vs. biking to work in each USA state",   
+    x = "Number of ppl walking to work (log N)",             
+    y = "Number of ppl biking to work (log N)",
+    color = "State region"
+  )
 ```

@@ -1,9 +1,9 @@
 ---
 title: "Assignment 3: Model comparison"
-author: "Marton Kovacs"
+author: "Marton Kovacs"  
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: console 
 ---
 
 In this lab assignment you are going to work with (simulated) data related to perioperative pain and its psychological and hormonal predictors. In the assignment you will assess the added benefit of including some psychological and hormonal predictors to the already established demographic predictors of pain.
@@ -58,25 +58,84 @@ In your discussion of the findings, briefly interpret the results of the above a
 
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
 
+
+# Install and load the required package
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(car)        
+library(lmtest)     
+library(MASS) 
+library (readxl)
+library (ggplot2)
+```
+
+
+
 ```{r}
 
+url <- "https://github.com/elte-ppk-r-course/Fall-2024/raw/refs/heads/main/data/assignment_3_dataset_.xlsx"
+
+temp_file <- tempfile(fileext = ".xlsx")
+
+download.file(url, temp_file, mode = "wb")
+
+data <- read_excel(temp_file)
+head(data)
 ```
 
 ## Data and model diagnostics 
 ### Data diagnostics
-#### Descriptives of the variables
 
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+data %>% 
+  select_if(is.numeric) %>%  
+  gather() %>%
+  ggplot(aes(x=value)) + 
+  geom_histogram(bins = 30, fill = "green", alpha = 0.7) +
+  facet_wrap(~key, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "Histograms of Numeric Variables")
+str(data)
+summary(data)
+data$sex <- as.factor(data$sex)
+colSums(is.na(data))
+str(data)
+
+data %>%
+  pivot_longer(cols = where(is.numeric)) %>%  
+  ggplot(aes(x = value)) +
+  geom_boxplot() +
+  facet_wrap(~name, scales = "free") + 
+  
+  coord_flip() +
+  theme_minimal()
+
 
 ```
-
+#### Descriptives of the variables
+```{r}
+summary(data)
+```
 #### Correct coding errors
 
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
+
 ```{r}
+# sex variable has an error (woman vs female), so I recode woman to female
+data <- data %>%
+  mutate(sex = dplyr::recode(sex, "woman" = "female"))
+#mindfulness has a value bigger than the range 
+data <- data %>% filter (mindfulness<=6)
+#pain seems to have a misspelled value 50 (instead of 5 I guess)
+data_filtered <- data %>% filter(pain != 50)
+#Weight and IQ variables have outliers (low, but possible, and not necessarily errors). However, I don't need to make a decision about them since they are not included in my model.
 
 ```
 
@@ -86,7 +145,8 @@ If you find values in the dataset during the EDA, that are not correct based on 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
-
+model <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = data)
+summary(model)
 ```
 
 #### Checking for influential outliers
@@ -95,6 +155,18 @@ Check for outlier values in the model.
 
 ```{r}
 
+cooks_dist <- cooks.distance(model)
+
+influential <- which(cooks_dist > 1)
+print(influential)
+
+#pain doesn't seem to be influential, but I still will use the filtered data
+
+model_filtered <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = data_filtered)
+
+summary(model_filtered)
+
+
 ```
 
 #### Checking assumptions
@@ -102,18 +174,55 @@ Check for outlier values in the model.
 Check the normality assumption.
 
 ```{r}
+#The assumption of normality is satisfied
+
+shapiro.test(residuals(model_filtered))
+
+
+residuals_data <- residuals(model_filtered)
+
+residuals_df <- data.frame(residuals = residuals(model_filtered))
+
+ggplot(residuals_df, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "blue") +
+  labs(
+    title = "Q-Q Plot of Residuals",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  ) +
+  theme_minimal()
+
+ggplot(residuals_df, aes(x = residuals)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Histogram of Residuals",
+    x = "Residuals",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
 
 ```
 
 Check the linearity assumption.
 
 ```{r}
-
+#The assumption of linearity is satisfied
+car::crPlots(model_filtered)
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
+#The assumption of homoscedasticity is satisfied
+
+plot(model_filtered$fitted.values, residuals(model_filtered), 
+     main = "Residuals vs Fitted", xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+# Breusch-Pagan test
+bptest(model_filtered)
 
 ```
 
@@ -126,7 +235,9 @@ https://statisticalhorizons.com/multicollinearity
 http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis
 
 ```{r}
+#cortisol_saliva and cortisol_serum are correlated
 
+car::vif(model_filtered)
 ```
 
 ### Making decision based on model diagnostics
@@ -134,13 +245,18 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
-
+# I leave cortisol saliva because it seems to be more precise as I read
+model_filtered_updated <- lm(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_saliva, data = data_filtered)
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
 
+cooks_dist <- cooks.distance(model_filtered_updated)
+
+influential <- which(cooks_dist > 1)
+print(influential)
 ```
 
 #### Checking assumptions of the updated model
@@ -148,25 +264,55 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 Normality assumption
 
 ```{r}
+#The requirements of the assumptions below are met: 
+
+shapiro.test(residuals(model_filtered_updated))
+
+residuals_df <- data.frame(residuals = residuals(model_filtered_updated))
+
+
+ggplot(residuals_df, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "blue") +
+  labs(
+    title = "Q-Q Plot of Residuals",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  ) +
+  theme_minimal()
+
+ggplot(residuals_df, aes(x = residuals)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Histogram of Residuals",
+    x = "Residuals",
+    y = "Frequency"
+  ) +
+  theme_minimal()
 
 ```
 
 Linearity assumption
 
 ```{r}
-
+car::crPlots(model_filtered_updated)
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
+plot(model_filtered_updated$fitted.values, residuals(model_filtered_updated), 
+     main = "Residuals vs Fitted", xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
 
+
+bptest(model_filtered_updated)
 ```
 
 Multicollinearity assumption
 
 ```{r}
-
+car::vif(model_filtered_updated)
 ```
 
 ## Model comparison
@@ -174,18 +320,78 @@ Multicollinearity assumption
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
+simple_model <- lm(pain ~ age + sex, data = data_filtered)
 
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
-```{r}
-
-```
 
 Compare the two models.
 
 ```{r}
+AIC(simple_model,model_filtered_updated)
+
+lrtest(simple_model,model_filtered_updated)
+anova(simple_model,model_filtered_updated)
+
+coefficients <- summary(model_filtered_updated)$coefficients
+equation <- paste0("Pain = ", round(coefficients[1, 1], 2), " + ",
+                   paste(paste0(round(coefficients[-1, 1], 2), " * ", names(coefficients[-1, 1])),
+                         collapse = " + "))
+equation
+
+library(stargazer)
+
+# Regression table
+stargazer(
+  simple_model, model_filtered_updated,
+  type = "text", 
+  title = "Regression Results for Simple and Complex Models",
+  dep.var.labels = c("Pain"), 
+  covariate.labels = c("Age", "Sex (Male)", "STAI Trait", "Pain Catastrophizing", 
+                       "Mindfulness", "Cortisol Saliva"), 
+  star.cutoffs = c(0.05, 0.01, 0.001), 
+  notes = "Significance levels: *** p < 0.001, ** p < 0.01, * p < 0.05"
+)
+
+
+# coefficients and confidence intervals 
+coeff_simple <- summary(simple_model)$coefficients
+coeff_complex <- summary(model_filtered_updated)$coefficients
+confint_simple <- confint(simple_model)
+confint_complex <- confint(model_filtered_updated)
+
+
+simple_table <- data.frame(
+  Predictor = rownames(coeff_simple),
+  Unstd_B = round(coeff_simple[, 1], 3),
+  Std_Error = round(coeff_simple[, 2], 3),
+  CI_Lower = round(confint_simple[, 1], 3),
+  CI_Upper = round(confint_simple[, 2], 3),
+  p_Value = round(coeff_simple[, 4], 3)
+)
+
+
+complex_table <- data.frame(
+  Predictor = rownames(coeff_complex),
+  Unstd_B = round(coeff_complex[, 1], 3),
+  Std_Error = round(coeff_complex[, 2], 3),
+  CI_Lower = round(confint_complex[, 1], 3),
+  CI_Upper = round(confint_complex[, 2], 3),
+  p_Value = round(coeff_complex[, 4], 3)
+)
+
+
+cat("Simple Model Results:\n")
+knitr::kable(simple_table, caption = "Simple Model Regression Results")
+
+cat("\nComplex Model Results:\n")
+knitr::kable(complex_table, caption = "Complex Model Regression Results")
+
+#Simple Model:In the simple model, which includes only age and sex as predictors, the variable age is a statistically significant negative predictor of pain (β = -0.084, p < 0.001). 
+
+#Complex Model:The complex model includes additional predictors: STAI trait, pain catastrophizing, mindfulness, and cortisol saliva. In this model, age remains negative but is no longer statistically significant (β = -0.020, p = 0.416), suggesting that its predictive power diminishes when other variables are included.Pain catastrophizing (β = 0.098, p < 0.01) is a significant positive predictor of pain. Similarly, cortisol saliva (β = 0.597, p < 0.001) is a highly significant positive predictor. Other predictors are not significant in the complex model.
+#Discussion:The complex model incorporates additional predictors such as pain catastrophizing and cortisol saliva, which provide significant explanatory power. The negative relationship between age and pain becomes non-significant in this model, suggesting that the predictive influence of age is confounded by other factors. The complex model shows improved fit statistics (lower AIC, higher F-statistic), and the inclusion of significant predictors such as pain catastrophizing and cortisol saliva supports its superiority over the simple model. This means that factors such as pain catastrophizing and stress have the greatest influence on perioperative pain in dental surgeries (or at least the dental surgery type in question) and are the only significant contributors to pain among all the factors mentioned above.
 
 ```
-
