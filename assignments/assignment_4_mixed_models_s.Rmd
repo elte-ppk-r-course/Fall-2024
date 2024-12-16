@@ -8,7 +8,17 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+# install.packages("haven")
+# install.packages("lme4")
+# install.packages("performance")
+# install.packages("broom.mixed")
+
 library(tidyverse)
+library(haven)
+library(lme4)
+library(performance)
+library(broom.mixed)
 ```
 
 # Introduction
@@ -58,7 +68,9 @@ Compare the model coefficients and the confidence intervals observed in this ass
 Read the datasets used in this assignment. Pay attention to the extensions of the datafiles.
 
 ```{r}
-
+# Reading the datasets from link
+dataset_a <- read_sav("https://github.com/HujberAL/Fall-2024/raw/refs/heads/main/data/assignment_4_dataset_A_.sav")
+dataset_b <- read_sav("https://github.com/HujberAL/Fall-2024/raw/refs/heads/main/data/assignment_4_dataset_B_.sav")
 ```
 
 ## Exploratory data analysis
@@ -66,7 +78,37 @@ Read the datasets used in this assignment. Pay attention to the extensions of th
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+EDA_data_a <- dataset_a %>%
+  gather(key = "pred", value = "value", age, STAI_trait, pain_cat, mindfulness, cortisol_serum, cortisol_saliva) # To run the analysis, reshape the dataset from wide to long
 
+titles_for_EDA <- c("age" = "Age",
+                    "STAI_trait" = "State Trait Anxiety Inventory",
+                    "pain_cat" = "Pain Catastrophizing Scale",
+                    "mindfulness" = "Mindful Attention Awareness Scale",
+                    "cortisol_serum" = "Cortisol measured from blood",
+                    "cortisol_saliva" = "Cortisol measured from saliva"
+                    ) # Custom titles for plots
+
+ggplot(EDA_data_a, aes(x = value, y = pain)) + # Connection of each predictor with pain in one plot 
+  geom_point(aes(color = sex)) +  # Scatter plot with points colored by sex
+  geom_smooth(method = "lm", se = FALSE, color = "black") +  # Linear regression line to see the connection
+  facet_wrap(~ pred, scales = "free_x", labeller = labeller(pred = titles_for_EDA)) +  # Facet by the pred variable
+  labs(x = "Value of predictor", y = "Pain (1-10)", color = "Sex") + # Captions
+  theme_minimal() + # Minimalistic theme
+  theme(legend.position = "bottom")  # Move legend to the bottom
+```
+
+```{r}
+EDA_data_b <- dataset_b %>%
+  gather(key = "pred", value = "value", age, STAI_trait, pain_cat, mindfulness, cortisol_serum, cortisol_saliva) # To run the analysis, reshape the dataset from wide to long
+
+ggplot(EDA_data_b, aes(x = value, y = pain)) + # Connection of each predictor with pain in one plot 
+  geom_point(aes(color = sex)) +  # Scatter plot with points colored by sex
+  geom_smooth(method = "lm", se = FALSE, color = "black") +  # Linear regression line to see the connection
+  facet_wrap(~ pred, scales = "free_x", labeller = labeller(pred = titles_for_EDA)) +  # Facet by the pred variable
+  labs(x = "Value of predictor", y = "Pain (1-10)", color = "Sex") + # Captions
+  theme_minimal() + # Minimalistic theme
+  theme(legend.position = "bottom")  # Move legend to the bottom
 ```
 
 ## Correct coding errors
@@ -74,6 +116,90 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+dataset_a <- dataset_a %>%
+  mutate(sex = str_replace(sex, "Male", "male")) # Replacing the wrong non-numeric value" 
+   
+# Checking the thresholds for dataset A    
+dataset_a$pain <- ifelse(dataset_a$pain < 0 | dataset_a$pain > 10, NA, dataset_a$pain)
+dataset_a$STAI_trait <- ifelse(dataset_a$STAI_trait < 20 | dataset_a$STAI_trait > 80, NA, dataset_a$STAI_trait)
+dataset_a$pain_cat <- ifelse(dataset_a$pain_cat < 0 | dataset_a$pain_cat > 52, NA, dataset_a$pain_cat)
+dataset_a$mindfulness <- ifelse(dataset_a$mindfulness < 1 | dataset_a$mindfulness > 6, NA, dataset_a$mindfulness)
 
+# Checking the thresholds for dataset B 
+dataset_b$pain <- ifelse(dataset_b$pain < 0 | dataset_b$pain > 10, NA, dataset_b$pain)
+dataset_b$STAI_trait <- ifelse(dataset_b$STAI_trait < 20 | dataset_b$STAI_trait > 80, NA, dataset_b$STAI_trait)
+dataset_b$pain_cat <- ifelse(dataset_b$pain_cat < 0 | dataset_b$pain_cat > 52, NA, dataset_b$pain_cat)
+dataset_b$mindfulness <- ifelse(dataset_b$mindfulness < 1 | dataset_b$mindfulness > 6, NA, dataset_b$mindfulness)
 ```
+
+## Creating the model:
+
+```{r}
+# Creating the linear mixed model
+model_a <- lmer(pain ~ age + sex + STAI_trait + pain_cat + mindfulness + cortisol_serum + (1 | hospital), data = dataset_a) 
+
+model_a_sum <- summary(model_a) # Summarizing for extraction of data to be reported
+```
+
+## Creating the values to report:
+
+```{r}
+coef_model_a <- model_a_sum$coefficients # Get the model coefficients
+
+coef_table <- data.frame( # Data in data frame to be reported
+  Predictor = rownames(coef_model_a),
+  Estimate = coef_model_a[, "Estimate"],
+  `Std. Error` = coef_model_a[, "Std. Error"],
+  `t value` = coef_model_a[, "t value"]
+)
+
+coef_table$p.value <- 2 * (1 - pnorm(abs(coef_table$Estimate / coef_table$Std..Error))) # Calculating the p value
+
+
+conf_int_model_a <- confint(model_a, level = 0.95) # Calculating confidence intervals
+CI_data <- conf_int_model_a[-c(1, 2), ] # Get the part what we need (first two rows not needed)
+
+coef_table$Lower_CI <- CI_data[2, 1] # CI-s to data frame
+coef_table$Upper_CI <- CI_data[2, 2]
+
+print(coef_table) # Report the data
+```
+
+## R² values in model A:
+
+```{r}
+r2_results <- r2(model_a) # Calculate marginal and conditional R² for the mixed model
+
+print(r2_results) # Report the results
+```
+
+## Prediction of pain:
+
+```{r}
+dataset_b$predicted_pain <- predict(model_a, newdata = dataset_b, re.form = NA) # Prediction of pain in dataset B from fixed effects coef from model A
+
+print(dataset_b$predicted_pain) # Report the result
+```
+
+## RSS and TSS:
+
+```{r}
+RSS_pain <- sum((dataset_b$pain - dataset_b$predicted_pain)^2) # Calculating the residual sum of squares
+
+TSS_pain <- sum((dataset_b$pain - mean(dataset_b$pain))^2) # Calculating the total sum of squares
+
+r2_dataset_b <- 1 - (RSS_pain / TSS_pain) # Calculate R² for dataset B
+
+print(RSS_pain) # Report the results
+print(TSS_pain) # Report the results
+```
+
+## All R² values:
+
+```{r}
+cat("Marginal R² (Dataset A): ", r2_results$R2_marginal, "\n")
+cat("Conditional R² (Dataset A): ", r2_results$R2_conditional, "\n")
+cat("R² (Dataset B): ", r2_dataset_b, "\n")
+```
+
 
