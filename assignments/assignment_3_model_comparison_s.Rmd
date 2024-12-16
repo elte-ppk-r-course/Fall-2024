@@ -54,12 +54,24 @@ In your discussion of the findings, briefly interpret the results of the above a
 
 # Solution
 
+```{r}
+library(readxl) #read_xlsx()
+library(tidyverse)
+library(broom) #glance()
+library(ggfortify) #autoplot()
+library(ggcorrplot) #ggcorrplot()
+library(car) # vif()
+library(lmtest) #lrtest()
+library(lm.beta) # standard regression coeffs
+```
+
+
 ## Read the data
 
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
 
 ```{r}
-
+pain <- read_xlsx("./data/assignment_3_dataset_.xlsx")
 ```
 
 ## Data and model diagnostics 
@@ -69,6 +81,34 @@ Read the dataset used in this assignment. Pay attention to the extension of the 
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+pain <- pain |> relocate(sex, .after = ID)
+
+pain |> filter(if_any(everything(), is.na)) # 0 NAs in dataset
+
+# Categorical variables: ID, sex
+levels(factor(pain$ID))
+levels(factor(pain$sex))
+table(pain$sex)
+table(pain$ID)
+ggplot(pain, aes(x=sex)) +
+  geom_bar()
+
+# Numeric variables
+
+## Means and standard deviations
+pain |> pivot_longer(cols= -c(ID, sex), 
+                     names_to = "measure",
+                     values_to = "value" ) |>
+  summarize(mean= mean(value), std_dev = sd(value), min = min(value), max= max(value), median = median(value), .by = measure)
+
+## Histograms
+pain |> pivot_longer(cols= -c(ID, sex), 
+                     names_to = "measure",
+                     values_to = "value" ) |>
+  ggplot(pain, mapping= aes(x=value)) +
+  geom_histogram()+
+  facet_wrap(~ measure, scale ="free")
+
 
 ```
 
@@ -77,7 +117,14 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
-
+# Correcting 1 "woman" to "female" + filtering 1 pain > 10, and 1 MAAS > 6
+pain_cleaned <- pain |>
+  mutate( sex = case_when(
+    sex == "female" ~ 2,
+    sex == "male" ~ 2,
+    sex == "woman" ~ 1
+  )) |>
+  filter(pain <= 10 & mindfulness <= 6)
 ```
 
 ### Model diagnostics
@@ -86,6 +133,12 @@ If you find values in the dataset during the EDA, that are not correct based on 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
+# more complex model (age, sex, STAI, pain catastrophizing, mindfulness, and cortisol measures as predictors, and pain as an outcome)
+
+complex_model <- lm(formula = pain ~ age + sex + STAI_trait + pain_cat + cortisol_serum + cortisol_saliva + mindfulness, data = pain_cleaned)
+
+glance(complex_model)
+summary(complex_model)
 
 ```
 
@@ -94,6 +147,20 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+# columns of interest: std.resid (standard residuals), .cooksd (Cook's distance), .hat (leverage)
+complex_model |> 
+  augment() |>
+  arrange(desc(.hat))
+
+complex_model |> 
+  augment() |>
+  arrange(desc(.cooksd))
+# all Cook's distances are under 1
+
+complex_model |> 
+  augment() |>
+  arrange(desc(.std.resid))
+# all standard residuals are under 3
 
 ```
 
@@ -102,19 +169,25 @@ Check for outlier values in the model.
 Check the normality assumption.
 
 ```{r}
+# Q-Q plot
+autoplot(complex_model, which = 2)
 
+# Histogram of residuals
+ggplot() +
+  geom_histogram(aes(complex_model$residuals, y =..density..)) +
+  stat_function(fun = dnorm, args = list(mean = mean(complex_model$residuals), sd = sd(complex_model$residuals)))
 ```
 
 Check the linearity assumption.
 
 ```{r}
-
+autoplot(complex_model, which = 1)
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
-
+autoplot(complex_model, which = 3)
 ```
 
 Check the multicollinearity assumption.
@@ -126,6 +199,15 @@ https://statisticalhorizons.com/multicollinearity
 http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis
 
 ```{r}
+# Correlation matrix
+pain_cleaned |>
+  select(sex:mindfulness) |>
+  cor() |>
+  ggcorrplot( hc.order = TRUE, type = "upper", lab = TRUE)
+# cortisol_serum - cortisol_saliva correlation of 0.91
+
+vif(complex_model) 
+# VIFs for cortisol_serum and cortisol_saliva are above 6
 
 ```
 
@@ -134,12 +216,28 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
+# Either cortisol_serum or cortisol_saliva needs to be excluded
+
+complex_model_updated <- lm(formula = pain ~ age + sex + STAI_trait + pain_cat + cortisol_serum + mindfulness, data = pain_cleaned)
 
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+complex_model_updated |> 
+  augment() |>
+  arrange(desc(.hat))
+
+complex_model_updated |> 
+  augment() |>
+  arrange(desc(.cooksd))
+# all Cook's distances are under 1
+
+complex_model_updated |> 
+  augment() |>
+  arrange(desc(.std.resid))
+# all standard residuals are under 3
 
 ```
 
@@ -148,25 +246,37 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 Normality assumption
 
 ```{r}
+autoplot(complex_model, which = 2)
 
+ggplot() +
+  geom_histogram(aes(complex_model_updated$residuals, y =..density..)) +
+  stat_function(fun = dnorm, args = list(mean = mean(complex_model_updated$residuals), sd = sd(complex_model_updated$residuals)))
 ```
 
 Linearity assumption
 
 ```{r}
-
+autoplot(complex_model, which = 1)
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
-
+autoplot(complex_model, which = 3)
 ```
 
 Multicollinearity assumption
 
 ```{r}
+# Correlation matrix
+pain_cleaned |>
+  select(sex:mindfulness, -cortisol_saliva) |>
+  cor() |>
+  ggcorrplot( hc.order = TRUE, lab = TRUE)
+# No prominent correlations
 
+vif(complex_model_updated)
+# All VIFs under 3
 ```
 
 ## Model comparison
@@ -174,12 +284,41 @@ Multicollinearity assumption
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
+# simple model: age and sex as predictors of pain
+simple_model <- lm(formula = pain ~ age + sex, data = pain_cleaned)
 
+glance(simple_model)
+summary(simple_model)
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+# Reporting model metrics
+## F statistics, df, p value
+summary(simple_model)$fstatistic
+pf(summary(simple_model)$fstatistic[1], summary(simple_model)$fstatistic[2], summary(simple_model)$fstatistic[3], lower.tail = FALSE)
+
+summary(complex_model_updated)$fstatistic
+pf(summary(complex_model_updated)$fstatistic[1], summary(complex_model_updated)$fstatistic[2], summary(complex_model_updated)$fstatistic[3], lower.tail = FALSE)
+
+## Adj. R squared
+summary(simple_model)$adj.r.squared
+summary(complex_model_updated)$adj.r.squared
+
+## AIC
+glance(simple_model) %>% pull(AIC)
+glance(complex_model_updated) %>% pull(AIC)
+
+
+#Reporting predictor data (unstand. regr. coeff, stand. regr. coeff, se, stat, p, CI)
+cmplx_predictors <- tidy(complex_model_updated, conf.int = TRUE)
+smpl_predictors <- tidy(simple_model, conf.int = TRUE)
+
+smpl_predictors <- smpl_predictors |> mutate(stand_coeff = lm.beta(simple_model)$standardized.coefficients)
+
+cmplx_predictors <- cmplx_predictors |> mutate(stand_coeff = lm.beta(complex_model_updated)$standardized.coefficients)
+
 
 ```
 
@@ -187,5 +326,10 @@ Compare the two models.
 
 ```{r}
 
+anova(simple_model, complex_model_updated)
+lrtest(simple_model, complex_model_updated)
+
 ```
 
+##Discussion
+Based on the results above, the model comparision was in favour of the more complex model. The ANOVA and the LR test were significant and the R2 increased, while the AIC decreased a with the inclusion of more predictors. 

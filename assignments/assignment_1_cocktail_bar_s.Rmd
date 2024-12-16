@@ -32,7 +32,7 @@ Note: There are several different ways to solve these tasks, feel free to come u
 Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You can also find the codebook there.
 
 ```{r}
-
+cocktail <- read_tsv("./data/cocktail_data.tsv")
 ```
 
 ## 2. Transform the data table and clean the ingredient variable!
@@ -40,6 +40,12 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 The ingredients are currently in a single cell for each cocktail. It would be better to put them in separate rows. Also, the variable should be cleaned of all quantities (e.g. 1/2 oz, 2 dashes, etc.), and the indicator of alcohol content (e.g. 47.3% abv). You will need to use this cleaned table in later tasks.
 
 ```{r}
+cocktail <- cocktail %>% mutate( ingredients = gsub("<br>", "<br/>", ingredients))
+cocktail_new <- cocktail %>% separate_longer_delim(ingredients, delim = "<br/>")
+cocktail_new <- cocktail_new %>% mutate(
+  ingredients = gsub((".*oz |.*dashes |.*dash |.*drop |.*drops |.*bsp "), "",ingredients),
+  ingredients = gsub(" \\(.*$", "", ingredients)
+)
 
 ```
 
@@ -48,7 +54,7 @@ The ingredients are currently in a single cell for each cocktail. It would be be
 Before opening the bar, you need to find a reliable supplier that has all the ingredients. You need to send a list of all possible ingredients you will need. They don't need the quantities (i.e. how many of these are needed), just the names of the ingredients.
 
 ```{r}
-
+cocktail_new <- cocktail_new %>% arrange(ingredients)
 ```
 
 ## 4. Number of unique ingredients
@@ -56,7 +62,8 @@ Before opening the bar, you need to find a reliable supplier that has all the in
 How many different ingredients you will need?
 
 ```{r}
-
+unique_ing <- cocktail_new |>
+  summarize( unique_ingr_nr =n_distinct(ingredients))
 ```
 
 ## 5. What are the top 10 ingredients?
@@ -64,7 +71,10 @@ How many different ingredients you will need?
 What are the 10 most frequently used ingredients? If there are ties, you can list more than 10.
 
 ```{r}
-
+top10 <- cocktail_new |>
+  summarise(n = n(), .by = ingredients) |>
+  arrange(desc(n)) |>
+  slice_head(n = 10)
 ```
 
 ## 6. Which cocktail(s) has/have the most ingredients?
@@ -72,25 +82,40 @@ What are the 10 most frequently used ingredients? If there are ties, you can lis
 Count the number of ingredients and filter all the cocktails that has that many.
 
 ```{r}
-
+top_ing <- cocktail_new |> 
+  summarise(db = n(), .by = name) |>
+  arrange(desc(db)) |>
+  slice_max(db)
 ```
 
 ## 7. How many ingredients appear in only one cocktail (rare ingredient)?
 
 ```{r}
 
+rare_ingredients <- cocktail_new |>
+  summarise(mn = n(), .by = ingredients) |>
+  arrange(mn) |>
+  slice_min(mn) 
+
+rare_ing <- rare_ingredients |>
+    summarize(rare_ingredients = n())
+
 ```
 
 ## 8. Which cocktail has an ingredient that is only used in one cocktail?
 
 ```{r}
-
+rare_drinks <- cocktail_new |>
+  filter(ingredients %in% rare_ingredients$ingredients) |>
+  summarise(.by = name)
 ```
 
 ## 9. What are the cocktails without rare ingredients?
 
 ```{r}
-  
+common_drinks <- cocktail_new |> 
+  filter(!name %in% rare_drinks$name) |>
+  summarise(.by = name)    
 ```
 
 ## 10. Create a cheat sheet for the bartender!
@@ -98,7 +123,8 @@ Count the number of ingredients and filter all the cocktails that has that many.
 Create a matrix that shows all cocktail names as rows and all ingredients as columns. When a cocktail requires an ingredient, there should be an "X" in the cell, otherwise, the cell should remain empty. Example:
 
 ```{r}
-
+cocktail_new <- cocktail_new %>% mutate( X ="x")
+cheatsheet <- cocktail_new %>% pivot_wider(names_from = ingredients, values_from = X, values_fill = list(" "))
 ```
 
 

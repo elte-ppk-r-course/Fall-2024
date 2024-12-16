@@ -20,7 +20,8 @@ You will have to create 3 plots based on the datasets and instructions detailed 
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(tidytuesdayR)
-```
+library(scales)
+`````````
 
 ## Task 1: Climbing expeditions
 
@@ -31,6 +32,24 @@ The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the thre
 -   The bar colors use the viridis palette and light theme.
 
 ```{r}
+climb <- tt_load("2020-09-22", files = "expeditions.csv")
+climb <- climb$expeditions
+
+climb2 <- climb |>  
+  mutate(top_15 = fct_lump(peak_name, n=15, other_level = "Other")) |>
+  filter(top_15 !="Other") |>
+  count(top_15, season)
+  
+
+task1 <- ggplot(climb2, mapping = aes(x=fct_reorder(top_15,n, sum), y= n, fill = season)) +
+  geom_bar(stat = "identity")+
+  scale_fill_viridis_d()+
+  theme_light() +
+  coord_flip() +
+  theme(legend.position = "bottom") +
+  labs( title="The 15 most popular peaks stacked by season of expedition", y="Number of expeditions", x=NULL)
+
+task1
 
 ```
 
@@ -45,7 +64,23 @@ Notes:
 -   The line size is 1.2, the colors are from the brewer "Dark2" palette. The theme is set to minimal.
 
 ```{r}
+phd <- tt_load("2019-02-19", files = "phd_by_field.csv")
+phd <- phd$phd_by_field
 
+phd <- phd |> filter(!is.na(n_phds))
+
+phd2 <- aggregate(phd$n_phds, by=list(phd$broad_field, phd$year), FUN = "sum")
+
+task2 <- ggplot(phd2, aes(x=Group.2, y=x, group = Group.1, color= Group.1))+
+  geom_line(linewidth = 1.2) +
+  scale_x_continuous(breaks = pretty_breaks(n=4)) +
+  scale_y_continuous(labels=comma_format()) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal()+
+  theme(legend.position = "right") +
+  labs(title = "Nr of awarded PhDs in the US by year", x=NULL, y=NULL, color = "Broad field")
+
+task2
 ```
 
 ## Task 3: Commute in the US
@@ -59,5 +94,26 @@ Notes:
 -   The point size is 2, . The theme is set to light.
 
 ```{r}
+comm <- tt_load("2019-11-05", files = "commute.csv")
+comm <- comm$commute
+
+comm <- comm |> filter(!is.na(n))
+
+comm2 <- aggregate(comm$n, by=list(comm$state_region, comm$state, comm$state_abb, comm$mode), FUN = "sum")|>
+  pivot_wider(names_from = Group.4, values_from = x)
+
+task3 <- ggplot(comm2, mapping =aes(x=Bike, y=Walk, group = Group.1, color=Group.1)) +
+  geom_point(size =2) +
+  geom_text(aes(label = state.abb), colour ="black")+
+  scale_y_log10(labels=comma_format())+
+  scale_x_log10(labels=comma_format())+
+  theme_light()+
+  theme(legend.position = "right")+
+  labs(title = "Nr of people walking vs. biking to work in each US state",
+       x="Nr of people biking to work (logN)",
+       y="Nr of people walking to work (logN)",
+       color= "State region")
+
+task3  
 
 ```

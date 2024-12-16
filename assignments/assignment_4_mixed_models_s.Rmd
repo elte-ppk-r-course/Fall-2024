@@ -9,6 +9,13 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(haven) # read_sav()
+library(lme4) # lmer()
+library(broom.mixed) # tidy()
+library(performance) # check_model(), r2()
+library(caret) # R2()
+library(readxl) # read_xlsx()
+library(lm.beta) #lm.beta()
 ```
 
 # Introduction
@@ -58,7 +65,8 @@ Compare the model coefficients and the confidence intervals observed in this ass
 Read the datasets used in this assignment. Pay attention to the extensions of the datafiles.
 
 ```{r}
-
+painA <- read_sav("./data/assignment_4_dataset_A_.sav")
+painB <- read_sav("./data/assignment_4_dataset_B_.sav")
 ```
 
 ## Exploratory data analysis
@@ -66,6 +74,41 @@ Read the datasets used in this assignment. Pay attention to the extensions of th
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+painA |> glimpse()
+
+painA <- painA |> relocate(hospital, .after = ID) |> relocate(sex, .after = hospital) #better visibility
+
+painA |> filter(if_any(everything(), is.na)) # 0 NAs in dataset
+
+# Categorical variables: ID, sex, hospital
+table(painA$sex)
+table(painA$hospital)
+
+
+# Numeric variables
+
+## Means and standard deviations
+painA |> pivot_longer(cols= -c(ID, sex, hospital), 
+                     names_to = "measure",
+                     values_to = "value" ) |>
+  summarize(mean= mean(value), std_dev = sd(value), min = min(value), max= max(value), median = median(value), .by = measure)
+
+## Histograms
+painA |> pivot_longer(cols= -c(ID, sex, hospital), 
+                     names_to = "measure",
+                     values_to = "value" ) |>
+  ggplot(painA, mapping= aes(x=value)) +
+  geom_histogram()+
+  facet_wrap(~ measure, scale ="free")
+
+# Pain across hospitals comparision
+ggplot(painA, aes(hospital, pain))+
+  geom_bar(stat = "summary", fun ="mean")
+
+ggplot(painA, aes(hospital, pain))+
+  geom_point()
+
+
 
 ```
 
@@ -74,6 +117,120 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+# Correcting 1 "Male" to "male", filtering 1 negative household income
+painA_cleaned <- painA |>
+  mutate( sex = case_when(
+    sex == "female" ~ "female",
+    sex == "male" ~ "male",
+    sex == "Male" ~ "male"
+  )) |>
+  filter(household_income >= 0)
 
 ```
+
+## Building model A
+
+```{r}
+painA_hospmdl <- lmer(pain ~ age + sex + STAI_trait + pain_cat + cortisol_serum + mindfulness + (1 | hospital), data = painA_cleaned)
+
+painA_hospmdl
+
+#Check model perofrmance: linearity, Normality, homoscedasticity
+check_model(painA_hospmdl)
+
+#Residuals
+painA_cleaned |>
+  mutate(residuals = summary(painA_hospmdl)$residuals) |>
+  ggplot(painA_cleaned, mapping = aes(pain, residuals)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+painA_cleaned |>
+  mutate(residuals = summary(painA_hospmdl)$residuals) |>
+  ggplot(painA_cleaned, mapping = aes(residuals)) +
+  geom_histogram()
+
+
+# Model summary
+summary(painA_hospmdl)
+
+# Coefficients of the model
+tidy(painA_hospmdl, conf.int = TRUE)|>
+  ggplot(hm_coef, mapping = aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high)) +
+    geom_hline( yintercept = 0) +
+    geom_linerange() +
+    geom_point() +
+    coord_flip()
+
+#VIF
+check_collinearity(painA_hospmdl)
+
+# Autocorrelation
+check_autocorrelation(painA_hospmdl)
+```
+
+## Comparing complex_model_updated (Assignment 3) with painA-hosp_md (Assignment 4)
+```{r}
+#Coefficients from the Assigment 3 model
+pain <- read_xlsx("./data/assignment_3_dataset_.xlsx")
+pain_cleaned <- pain |>
+  mutate( sex = case_when(
+    sex == "female" ~ 2,
+    sex == "male" ~ 2,
+    sex == "woman" ~ 1
+  )) |>
+  filter(pain <= 10 & mindfulness <= 6)
+complex_model_updated <- lm(formula = pain ~ age + sex + STAI_trait + pain_cat + cortisol_serum + mindfulness, data = pain_cleaned)
+
+cmplx_predictors <- tidy(complex_model_updated, conf.int = TRUE) |> mutate(stand_coeff = lm.beta(complex_model_updated)$standardized.coefficients)
+
+cmplx_predictors
+
+
+```
+
+
+## Predicting B with Model A
+
+```{r}
+pred_painB <- painB |> mutate( pain = predict(painA_hospmdl, painB, allow.new.levels = TRUE))
+
+pred_painB
+
+ggplot(painB, aes(pain_cat, cortisol_serum, color = pain))+
+  geom_point()+
+  scale_color_viridis_c(option = "D")+
+  geom_point(data = pred_painB, shape = 9, size = 0.4, color = "red")+
+  theme_bw()+
+  labs(title = "Predicted vs actual pain in relation to cortisol serum and pain catastrophising")
+```
+
+## Report of results
+```{r}
+# Coefficients of the model
+tidy(painA_hospmdl, conf.int = TRUE)
+
+# Fixed effects
+fixef(painA_hospmdl)
+
+#Residuals
+summary(painA_hospmdl)$residuals
+plot(painA_hospmdl)
+
+
+# Random intercept
+summary(painA_hospmdl)$varcor$hospital[1,1]
+ranef(painA_hospmdl)
+
+# Marginal and conditional R2 dataset A
+r2(painA_hospmdl)
+
+# R2 dataset B
+1- (sum((painB$pain - pred_painB$pain)^2) / sum((painB$pain-mean(painB$pain))^2))
+R2(pred_painB$pain, painB$pain)
+```
+
+# Discussion
+With the inclusion of the hospital clustering, the effect of sex, pain catastrophising and trait anxiety dropped below significance level, while the other predictors effect increased. The confidence intervals are seemingly narrower in the previous model. The newer model considers the effect of the hospitals.
+
 
