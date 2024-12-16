@@ -59,7 +59,13 @@ In your discussion of the findings, briefly interpret the results of the above a
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
 
 ```{r}
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(lmtest)
+library(car)
 
+adat_szet <- readxl::read_excel("../data/assignment_3_dataset_.xlsx")
 ```
 
 ## Data and model diagnostics 
@@ -69,7 +75,17 @@ Read the dataset used in this assignment. Pay attention to the extension of the 
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+glimpse(adat_szet)
+summary(adat_szet) # max pain is 50 -> remove data point // max mindfulness is 6.22 -> remove data point
 
+#visualising variable relationships
+ggplot(adat_szet, aes(age, pain)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm")
+
+ggplot(adat_szet, aes(sex, pain)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") # woman -> recode into female
 ```
 
 #### Correct coding errors
@@ -77,6 +93,10 @@ Run an exploratory data analysis (EDA) to investigate the dataset.
 If you find values in the dataset during the EDA, that are not correct based on the provided descriptions of the variables of the dataset please correct them here.
 
 ```{r}
+adat_szet <- adat_szet %>% 
+  filter(pain <= 10) %>% 
+  filter(mindfulness <= 6) %>% 
+  mutate(sex = ifelse(sex == "woman", "female", sex))
 
 ```
 
@@ -86,7 +106,9 @@ If you find values in the dataset during the EDA, that are not correct based on 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
+complex_model <- lm(pain ~ age + sex + STAI_trait + pain_cat + cortisol_serum + cortisol_saliva + mindfulness, adat_szet) #the __more complex model__ should contain the __predictors: age, sex, STAI, pain catastrophizing, mindfulness, and cortisol measures__
 
+summary(complex_model)
 ```
 
 #### Checking for influential outliers
@@ -94,6 +116,14 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+#par(mfrow = c(2, 2))
+plot(complex_model, 4) #diagnostics
+
+cooks_táv <- cooks.distance(complex_model)
+influential <- which(cooks_táv > (3 * mean(cooks_táv, na.rm = TRUE)))
+adat_szet_tiszta <- adat_szet[-influential, ] #remove data points larger than 3 times the mean of the cooks dis
+
+complex_model_2 <- lm(pain ~ age + sex + STAI_trait + pain_cat + cortisol_serum + cortisol_saliva + mindfulness, adat_szet_tiszta)
 
 ```
 
@@ -103,18 +133,36 @@ Check the normality assumption.
 
 ```{r}
 
+#before and after removing outliers
+plot(complex_model, 2)
+plot(complex_model_2, 2)
+#seems ok, appears to be somewhat of a straight line, we can assume normality
+
+shapiro.test(residuals(complex_model))
+
 ```
 
 Check the linearity assumption.
 
 ```{r}
+#before and after removing outliers
+plot(complex_model, 1)
+plot(complex_model_2, 1) 
+# there's a curve, not a straight line at zero, might not be a linear relation
 
+raintest(complex_model)
+#not significant rainbow test, so fit is not better with a range restriction, linearity is okay
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
 
+plot(complex_model, 3)
+plot(complex_model_2, 3) 
+# not sure from visual inspection
+bptest(complex_model)
+# no significant homoscedasticty, so it's okay
 ```
 
 Check the multicollinearity assumption.
@@ -127,6 +175,7 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 
 ```{r}
 
+vif(complex_model) #the two cortisol vars have >5 vif thresholds, redundancy might be cause of the two cortisol measures, so it is adviseable to remove either
 ```
 
 ### Making decision based on model diagnostics
@@ -134,12 +183,22 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
+complex_model_3 <- lm(pain ~ age + sex + STAI_trait + pain_cat + cortisol_saliva + mindfulness, adat_szet)
 
+summary(complex_model_3)
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+plot(complex_model_3, 4) #diagnostics
+
+cooks_táv <- cooks.distance(complex_model_3)
+influential <- which(cooks_táv > (3 * mean(cooks_táv, na.rm = TRUE)))
+adat_szet_tiszta <- adat_szet[-influential, ] #remove data points larger than 3 times the mean of the cooks dis
+
+complex_model_4 <- lm(pain ~ age + sex + STAI_trait + pain_cat + cortisol_saliva + mindfulness, adat_szet_tiszta) #could check if this is better
+
 
 ```
 
@@ -149,17 +208,29 @@ Normality assumption
 
 ```{r}
 
+
+plot(complex_model_4, 2)
+#seems ok, appears to be somewhat of a straight line, we can assume normality
+
+shapiro.test(residuals(complex_model_4))
 ```
 
 Linearity assumption
 
 ```{r}
+plot(complex_model_4, 1) 
+# there's a curve, not a straight line at zero, might not be a linear relation
 
+raintest(complex_model_4)
+#not significant rainbow test, so fit is not better with a range restriction, linearity is okay
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
+plot(complex_model_4, 3) 
+#seems fine, not significant breusch-pagan test
+bptest(complex_model)
 
 ```
 
@@ -167,6 +238,7 @@ Multicollinearity assumption
 
 ```{r}
 
+vif(complex_model_4) #okay now
 ```
 
 ## Model comparison
@@ -174,18 +246,68 @@ Multicollinearity assumption
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
+simple_model = lm(pain ~ age + sex, adat_szet)
+
+summary(simple_model)
+
+cooks_táv <- cooks.distance(simple_model)
+influential <- which(cooks_táv > (3 * mean(cooks_táv, na.rm = TRUE)))
+adat_szet_tiszta <- adat_szet[-influential, ] #remove data points larger than 3 times the mean of the cooks dis
+
+simple_model_2 = lm(pain ~ age + sex, adat_szet_tiszta)
+summary(simple_model_2)
 
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+complex_model_3 <- lm(pain ~ age + sex + STAI_trait + pain_cat + cortisol_saliva + mindfulness, adat_szet)
 
+summary(complex_model_4)
 ```
 
 Compare the two models.
 
 ```{r}
+AIC(simple_model) #simple model
+AIC(simple_model_2) # simple model without outliers, better fit
+AIC(complex_model_3) #more complex model seems to be better
+AIC(complex_model_4) #without outliers seems to be an even better fit
+
+
+anova(simple_model, complex_model_3) #significant, so better fit for the complex model - this couldnt be done for the outlier removed version
+
 
 ```
+Results and brief discussion:
 
+
+Hierarchical regression was conducted, evaluating a simple - only containing sex and age as explanatory variables- and a more complex - taking psychological factors into consideration - model. The simple model explained 14.7% of the variance in postoperative pain scores (\( R^2_{adj} = 0.135 \)), \( F(2, 143) = 12.31, p < 0.001 \), while the complex model explained 32.4% (\( R^2_{adj} = 0.323 \)), \( F(6, 151) = 13.53, p < 0.001 \). The complex model demonstrated a significantly better fit than the simple model, as evidenced by the ANOVA comparison (\( F(4, 151) = 15.62, p < 0.001 \)) and a lower AIC score (Simple Model: 572.48; Complex Model: 525.76).  Removing influential outliers from the complex model further improved the fit (AIC = 405.14).
+
+The table below presents the unstandardized coefficients (\( b \)), standardized coefficients (\( \beta \)), 95% confidence intervals (CIs), and p-values for the final complex model (after outlier removal). Pain catastrophizing (\( p < 0.001 \)) and cortisol levels (\( p < 0.001 \)) are significant predictors.
+
+| Predictor              | \( b \)   | \( \beta \)  | 95% CI (\( b \))         | p-value      |
+|------------------------|-----------|--------------|--------------------------|--------------|
+| Intercept              | 1.264     | -            | [-2.146, 4.674]          | 0.465        |
+| Age                    | -0.0198   | -0.081       | [-0.067, 0.028]          | 0.416        |
+| Sex (male)             | 0.3176    | 0.063        | [-0.100, 0.736]          | 0.134        |
+| STAI_trait             | -0.0300   | -0.080       | [-0.085, 0.025]          | 0.287        |
+| Pain catastrophizing   | 0.0981    | 0.309        | [0.043, 0.153]           | <0.001 **    |
+| Cortisol_saliva        | 0.5968    | 0.254        | [0.345, 0.849]           | <0.001 **    |
+| Mindfulness            | -0.1164   | -0.068       | [-0.365, 0.132]          | 0.357        |
+
+
+
+The final regression equation for the complex model is:
+
+\[
+\text{Pain} = 1.264 - 0.0198(\text{Age}) + 0.3176(\text{Sex}) - 0.0300(\text{STAI\_trait}) + 0.0981(\text{Pain\_cat}) + 0.5968(\text{Cortisol\_saliva}) - 0.1164(\text{Mindfulness})
+\]
+
+
+Assumptions of linear regression were assessed by visual inspection and assumption checks. The assumption of normality (Shapiro-Wilk \( W = 0.994 \), \( p = 0.829 \)) and linearity were met (Rainbow test \( F(79, 71) = 1.0148 \), \( p = 0.476 \)), homoscedasticity was confirmed (Breusch-Pagan \( \chi^2 = 6.76 \), \( p = 0.454 \)).
+
+---
+
+Pain catastrophizing (\( p < 0.001 \)) and cortisol levels (\( p < 0.001 \)) emerged as significant predictors of postoperative pain. This highlights how psychological vulnerability and stress can have an impact on the experience of the pain level and how this impact might be much more important than gender and other factors. Future directions could include also cognitive expectations, to further separate the effect of emotional states and cognitive evaluations in pain perception.
