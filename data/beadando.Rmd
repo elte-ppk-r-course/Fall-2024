@@ -1,0 +1,187 @@
+---
+title: "Beadando"
+output: html_document
+date: "2024-12-08"
+---
+
+## EU Student Mobility
+
+The selected topic is **EU Student Mobility** analysis. The source of data is coming from *https://raw.githubusercontent.com/rfordatascience/tidytuesday/refs/heads/main/data/2022/2022-03-08/erasmus.csv*
+The dataset contains data about Erasmus students moving two different schools. The data contains details about the students and about the institutes and locations.
+
+### Raw Data
+
+In this section I read the data from the raw CSV format, with skipping the possible empty lines, because these ones are irrelevant for my project.
+I print out the first few lines of the data to see how it looks like and also print out the name of all the columns, which is useful to know for later analysis.
+```{r readContent, echo=TRUE}
+library(knitr)
+library(tidyverse)
+
+dataSourceInput <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/refs/heads/main/data/2022/2022-03-08/erasmus.csv", show_col_types = FALSE, skip_empty_rows = TRUE)
+kable(head(dataSourceInput)) # Show the first few lines
+colnames(dataSourceInput) # Show all the column names
+```
+
+#### Data Dictionary 
+
+This chapter shows all the fields a short explanation. This documentation is coming from the source of the data.
+
+|variable                            |class     |description |
+|:-----------------------------------|:---------|:-----------|
+|project_reference                   |character |Project reference is an aggregation of several information (YYYY-X-AAAA-KKKKK-NNNNN) where YYYY represent year, X represents the round within the call year, AAAA represents the National Agency managing the project, KKKKK is the key action code and NNNNNN is an auto generated number |
+|academic_year                       |character | Only relevant for higher education (KA103, KA107) - Year-Month (YYYY-MM) |
+|mobility_start_month                |character | Year-Month (YYYY-MM) |
+|mobility_end_month                  |character | Year-Month (YYYY-MM) |
+|mobility_duration                   |double    | Exact duration of the mobility in calendar days (date2-date1) |
+|activity_mob                        |character |.           |
+|field_of_education                  |character | Participant field of education |
+|participant_nationality             |character | Code (DE, FR, BE, …..) |
+|education_level                     |character | Included where relevant |
+|participant_gender                  |character | Male/Female/Undefined |
+|participant_profile                 |character | Staff or learner, training can be retrieved from activity field |
+|special_needs                       |character | Yes/no|
+|fewer_opportunities                 |character | Yes/no |
+|group_leader                        |character | Yes/no |
+|participant_age                     |double    |Age at start of mobility in years |
+|sending_country_code                |character | Code (DE, FR, BE, …..) |
+|sending_city                        |character |City of sending organisation|
+|sending_organization                |character | Name of organisation |
+|sending_organisation_erasmus_code   |character | Organisation Erasmus code |
+|receiving_country_code              |character | Code (DE, FR, BE, …..) |
+|receiving_city                      |character | City of receiving organisationn |
+|receiving_organization              |character | Name of organisation |
+|receiving_organisation_erasmus_code |character | Organisation Erasmus code |
+|participants                        |double    | Total number of participants |
+
+### Handle missing values 
+
+I'm using summary function to check that each datafield value and to check if it contains NA's or not.
+```{r, echo=TRUE}
+summary(dataSourceInput)
+```
+The dataset does not contain any NA values, so I do not apply the na.omit() filtering function, which removes the rows with NA values.
+
+The used raw dataset contains the following number of rows:
+```{r, echo=TRUE}
+nrow(dataSourceInput) # Number of rows
+```
+I also check if the relevant fields are empty or not, so it does not contain useful information for my analysis. The documentation of the dataset says that "Undefined" is a possible value for the *participant_gender* field, so I filter out these rows as well. Beside that I use the rows only which is for moving abroad, because I'm interested in international movements.
+```{r, echo=TRUE}
+filteredData <- dataSourceInput %>%
+  filter(mobility_start_month != "" & mobility_end_month != "" & mobility_duration != ""
+         & participant_nationality != "" & participant_gender != "" & participant_gender != "Undefined"
+         & participant_age != "" & sending_country_code != "" & sending_city != "" & receiving_country_code != "" & receiving_city != "" & participants != ""
+         & sending_country_code != receiving_country_code) # Filter rows with empty or undefined values. And also filter out moving in the same country.
+nrow(filteredData) # Number of rows
+```
+Now the filtered data contains rows with relevant information.
+The next step is to convert the categorical values into factors. It helps processing in later phases.
+```{r, echo=TRUE}
+filteredData <- filteredData %>%
+  mutate(
+    participant_nationality = factor(participant_nationality),
+    participant_gender = factor(participant_gender),
+    sending_country_code = factor(sending_country_code),
+    receiving_country_code = factor(receiving_country_code)
+  )
+```
+
+### Visualization
+#### Gender distribution.
+To show the gender distribution I have to group the data by the gender data. And because *participants* field contains the number of participants for each row I have to summarize this value to get the correct result. With the use of ggplot I show the result.
+```{r, echo=TRUE}
+filteredData %>%
+  group_by(participant_gender) %>% # Grouping data by participant gender
+  summarise(total_participants = sum(participants)) %>% # Sum up the participant counts
+  ggplot(aes(x = participant_gender, y = total_participants)) + 
+  geom_bar(stat = "identity") +
+  labs(title = "Gender Distribution", x = "Gender", y = "Participant Count")
+```
+
+#### Mobility trends over years
+I show how many participants were involved in the international Erasmus program each year.
+To do this first I have to modify the *mobility_start_month* field because it's in YYYY-MM format, so with the substring function I get the year data. This can be used to group the data by. As in the previous transformation I summarize the participant counts. 
+```{r, echo=TRUE}
+participantsByYearData <- filteredData %>%
+  mutate(year = as.numeric(substr(mobility_start_month, 1,4))) %>% # Parse year value from the mobility_start_month
+  group_by(year) %>% # Group the data by year
+  summarise(total_participants = sum(participants)) # Sum up the participants
+
+ggplot(participantsByYearData, aes(x = year, y = total_participants)) +
+  geom_line(color= "yellow", size = 3) +
+  geom_point(color= "black", size =3) +
+  labs(
+    title= "Mobility Trends Over Years",
+    x = "Year",
+    y = "Participant Count"
+  )
+```
+
+### Hypothesis testing
+
+My hypothesis is that there is a significant difference in the popularity of Erasmus program between genders.
+To check my hypothesis I have to transfer the data to see how many participants were in the program by genders.
+The null hypothesis is that the popularity of Erasmus program is equal between genders.
+I prepare the data for analysis with grouping by years and genders, to examine the difference in each year, if any.
+
+```{r, echo=TRUE}
+genderBasedParticipantsByYearData <- filteredData %>%
+  mutate(year = as.numeric(substr(mobility_start_month, 1, 4))) %>% # Parse year value
+  group_by(year, participant_gender) %>% # Grouping by gender and year of participation
+  summarise(total_participants = sum(participants), .groups= "drop") # Count participants 
+
+print(genderBasedParticipantsByYearData) # Show the result
+```
+ 
+#### Perform Generalized Lineal Model
+I perform a **Poisson regression** with the number of participants as the outcome and participant gender as the predictor.
+Poisson regression is good for count data and able to model the relationship between a response variable (participants count) and predictors (gender, year).
+```{r, echo=TRUE}
+genderBasedParticipantsByYearData <- genderBasedParticipantsByYearData %>%
+  mutate(year = factor(year))
+
+model <- glm(total_participants ~ participant_gender + year, data = genderBasedParticipantsByYearData, family = poisson(link = "log"))
+summary(model)
+```
+
+In the result of the model I'm checking the P-value, which tells me if there is statistically significant difference between the genders.
+Because the P-value is lower than 0.05 it means that it rejects the null hypothesis, so I can conclude that the popularity of the Erasmus program between genders is not equal and it statistically significant and its true for each year.
+Another way to conclude this result is to see  participant_genderMale=-0.26442, this negative value indicates that males on avarage participate less in the Erasmus program, than females which is the reference category in this case.
+The model also shows that the participants has increased in year by year compared to 2014.
+
+The estimate is 6.04642, which is indicates the estimated count for Female in 2014 is around 422.75, which looks realistic since the real value is 423.
+The *participant_genderMale* estimate is -0.26442 shows how the male participation is behaves in context of the female participation, so it show males 23.23% less likely to participate in the Erasmus program.
+
+Since the Residual deviance is with value 5.6312 is very low compared to the Null deviance with value 3076.8278, shows a good model fit.
+
+### Statistical Model
+
+#### Check for Overdispersion
+
+To ensure that my Poisson model is correct I checked for overdispersion.
+```{r, echo=TRUE}
+dispersion <- sum(residuals(model, type = "pearson")^2) / model$df.residual
+dispersion
+```
+Since dispersion is slightly higher than 1 it means that the poisson model is correct.
+
+#### Q-Q plot (Quantile-Quantile plot)
+To check if the residuals follow a specific theoretical distribution. Expectation residuals are normally distributed.
+```{r, echo=TRUE}
+qqnorm(residuals(model, type = "deviance"))
+qqline(residuals(model), type = "deviance" , col = "red")
+```
+The points follows the reference line closely, which indicates the residuals are approximately normal.
+
+#### Residuals vs Fitted Values plot
+I expect this model shows that the residuals are randomly placed around zero. So I don't expect any pattern in the residuals, which can show an incorrect model.
+```{r, echo=TRUE}
+plot(fitted(model), residuals(model, type = "deviance"),
+     main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Deviance Residuals")
+abline(h = 0, col = "red")
+```
+
+It shows what i expected.
+
+### Summary
+With my analysis I tried to find out if the Erasmus program is more popular in any gender or not, when i check for moving abroad to study cases. I filtered the data and created a few interesting visualization like total gender distribution and popularity of the program year by year. After these steps I defined my hypothesis which was, that there is a significant difference in popularity of the program between genders if I examine the values in each year, so its a trend not just in the summarized values, but over years. My checks proved my hypothesis.

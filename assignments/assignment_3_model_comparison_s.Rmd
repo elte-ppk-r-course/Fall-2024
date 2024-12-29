@@ -8,7 +8,7 @@ editor_options:
 
 In this lab assignment you are going to work with (simulated) data related to perioperative pain and its psychological and hormonal predictors. In the assignment you will assess the added benefit of including some psychological and hormonal predictors to the already established demographic predictors of pain.
 
-In this assignment you will set up a hierarchical regression model to predict postoperative pain after wisdom tooth surgery. 
+In this assignment you will set up a hierarchical regression model to predict postoperative pain after wisdom tooth surgery.
 
 # Research problem
 
@@ -20,31 +20,31 @@ Your first study in this area is related to assessing the influence of trait and
 
 Use the data file called ‘assignment_3_dataset’, from the 'data/' folder.
 
-You have collected data from 160 adults who were scheduled to undergo surgical extraction of the third mandibular molar (wisdom tooth surgery). Patients filled out a form in the waiting room before their surgery. The form contained questions about their sex, age, and weight, and psychological questionnaires assessing anxiety, pain catastrophizing, and mindfulness (see descriptions below). You also got blood samples and saliva samples from participants in the waiting room 5 minutes before their operations to determine the serum (a component of the blood) and salivary cortisol levels of participants. Participants were contacted 5 hours after the surgery to see how much pain they were experiencing. The __level of pain__ at that moment was recorded using a numerical rating scale using a __scale of 0 to 10__, where 0 means “no pain” and 10 means “worst pain I can imagine”. 
+You have collected data from 160 adults who were scheduled to undergo surgical extraction of the third mandibular molar (wisdom tooth surgery). Patients filled out a form in the waiting room before their surgery. The form contained questions about their sex, age, and weight, and psychological questionnaires assessing anxiety, pain catastrophizing, and mindfulness (see descriptions below). You also got blood samples and saliva samples from participants in the waiting room 5 minutes before their operations to determine the serum (a component of the blood) and salivary cortisol levels of participants. Participants were contacted 5 hours after the surgery to see how much pain they were experiencing. The **level of pain** at that moment was recorded using a numerical rating scale using a **scale of 0 to 10**, where 0 means “no pain” and 10 means “worst pain I can imagine”.
 
-__The State Trait Anxiety Inventory:__ T measures trait anxiety on a scale of 20 to 80, higher scores mean higher anxiety. Anxiety has been found in many studies to positively correlate with the level of pain experienced. This is __variable STAI_trait__ in the dataset.
+**The State Trait Anxiety Inventory:** T measures trait anxiety on a scale of 20 to 80, higher scores mean higher anxiety. Anxiety has been found in many studies to positively correlate with the level of pain experienced. This is **variable STAI_trait** in the dataset.
 
-__The Pain Catastrophizing Scale__ measures the extent of pain catastrophizing, which is characterized by a tendency to magnify the threat value of a pain stimulus and to feel helpless in the presence of pain, as well as by a relative inability to prevent or inhibit pain-related thoughts in anticipation of, during, or following a painful event. The total score on this scale ranges from 0 to 52, higher scores mean higher catastrophizing. Pain catastrophizing is one of the well-established predictors of clinical pain. This is __variable pain_cat__ in the dataset.
+**The Pain Catastrophizing Scale** measures the extent of pain catastrophizing, which is characterized by a tendency to magnify the threat value of a pain stimulus and to feel helpless in the presence of pain, as well as by a relative inability to prevent or inhibit pain-related thoughts in anticipation of, during, or following a painful event. The total score on this scale ranges from 0 to 52, higher scores mean higher catastrophizing. Pain catastrophizing is one of the well-established predictors of clinical pain. This is **variable pain_cat** in the dataset.
 
-__The Mindful Attention Awareness Scale (MAAS)__ measures dispositional mindfulness, which may be described as a tendency to turn attention to present-moment experiences in an open, non-judgmental way. The MAAS total score ranges from 1 to 6 (an average of the item scores), with higher scores representing higher dispositional mindfulness. Trait mindfulness has been theorized to serve as a protective factor against pain, as the individual would be more objective about their pain experience and tend to associate less discomfort, despair, and hopelessness to the pain-related sensations. This is __variable mindfulness__ in the dataset.
+**The Mindful Attention Awareness Scale (MAAS)** measures dispositional mindfulness, which may be described as a tendency to turn attention to present-moment experiences in an open, non-judgmental way. The MAAS total score ranges from 1 to 6 (an average of the item scores), with higher scores representing higher dispositional mindfulness. Trait mindfulness has been theorized to serve as a protective factor against pain, as the individual would be more objective about their pain experience and tend to associate less discomfort, despair, and hopelessness to the pain-related sensations. This is **variable mindfulness** in the dataset.
 
-__Cortisol__ is a stress hormone associated with acute and chronic stress. Cortisol levels are thought to be positively associated with pain experience. Cortisol can be __measured from both blood and the saliva__, although, serum cortisol is often regarded in medical research as more reliably related to stress (serum is a component of the blood plasma). These are __variables cortisol_serum__, and __cortisol_saliva__ in the dataset.
+**Cortisol** is a stress hormone associated with acute and chronic stress. Cortisol levels are thought to be positively associated with pain experience. Cortisol can be **measured from both blood and the saliva**, although, serum cortisol is often regarded in medical research as more reliably related to stress (serum is a component of the blood plasma). These are **variables cortisol_serum**, and **cortisol_saliva** in the dataset.
 
 # Research question
 
 Previous studies and meta-analyses showed that age and sex are often predictors of pain (age is negatively associated with pain, while sex is a predictor more dependent on the type of the procedure). You would like to determine the extent to which taking into account psychological and hormonal variables aside from the already used demographic variables would improve our understanding of postoperative pain.
 
-To answer this research question you will __need to compare two models__ (with a hierarchical regression). The __simpler model__ should contain __age and sex as predictors of pain__, while the __more complex model__ should contain the __predictors: age, sex, STAI, pain catastrophizing, mindfulness, and cortisol measures__. Notice that the predictors used in the simpler model are a subset of the predictors used in more complex model. __You will have to do model comparison to assess whether substantial new information was gained about pain in the more complex model compared to the simpler model.__  
+To answer this research question you will **need to compare two models** (with a hierarchical regression). The **simpler model** should contain **age and sex as predictors of pain**, while the **more complex model** should contain the **predictors: age, sex, STAI, pain catastrophizing, mindfulness, and cortisol measures**. Notice that the predictors used in the simpler model are a subset of the predictors used in more complex model. **You will have to do model comparison to assess whether substantial new information was gained about pain in the more complex model compared to the simpler model.**
 
 # What to report
 
-As usual, before you can interpret your model, you will need to run data and model diagnostics. First, check the variables included in the more complex model (age, sex, STAI, pain catastrophizing, mindfulness, and cortisol measures as predictors, and pain as an outcome) for __coding errors__, and the model itself for __influential outliers__ (for example using Cook’s distance). Furthermore, check the final model to see if the __assumptions of linear regression hold true__, that is, __normality__ (of the residuals), __linearity__ (of the relationship), __homogeneity of variance__ (also called homoscedasticity) and that there is no excess __multicollinearity__ (“uncorrelated predictors” in Navarro’s words). If you find anything amiss during these checks, make the appropriate decision or correction and report your findings and actions in your report. 
+As usual, before you can interpret your model, you will need to run data and model diagnostics. First, check the variables included in the more complex model (age, sex, STAI, pain catastrophizing, mindfulness, and cortisol measures as predictors, and pain as an outcome) for **coding errors**, and the model itself for **influential outliers** (for example using Cook’s distance). Furthermore, check the final model to see if the **assumptions of linear regression hold true**, that is, **normality** (of the residuals), **linearity** (of the relationship), **homogeneity of variance** (also called homoscedasticity) and that there is no excess **multicollinearity** (“uncorrelated predictors” in Navarro’s words). If you find anything amiss during these checks, make the appropriate decision or correction and report your findings and actions in your report.
 
-__Note:__ If you do any changes, such as exclude cases, or exclude predictors from the model, you will have to re-run the above checks for your final data and model.
+**Note:** If you do any changes, such as exclude cases, or exclude predictors from the model, you will have to re-run the above checks for your final data and model.
 
 Report the results of the simpler model and the more complex model. For both models you should report the model test statistics (adj.R2, F, df, and p value). Also, report the statistics describing the coefficients of the predictors in a table format (unstandardized regression coefficients and 95% confidence intervals, standardized regression coefficients (B and Beta values), and p values).
 
-Write up the regression equation of the more complex model in the form of 𝑌 = 𝑏0 + 𝑏1 ∗ X1 + 𝑏2 ∗ X2 +…+ bn * Xn, in which you use the actual regression coefficients of your models. (b0 stands for the intercept and b1, b2 … bn stand for the model coefficients for each of the predictors, and X1, X2, … Xn denote the predictors).
+Write up the regression equation of the more complex model in the form of 𝑌 = 𝑏0 + 𝑏1 ∗ X1 + 𝑏2 ∗ X2 +…+ bn \* Xn, in which you use the actual regression coefficients of your models. (b0 stands for the intercept and b1, b2 … bn stand for the model coefficients for each of the predictors, and X1, X2, … Xn denote the predictors).
 
 Compare the two models in terms of how much variance they explain of pain’s variability in the sample. Report Akaike information criterion (AIC) for both models and the F test statistic and p value of the likelihood ratio test comparing the two models.
 
@@ -59,16 +59,79 @@ In your discussion of the findings, briefly interpret the results of the above a
 Read the dataset used in this assignment. Pay attention to the extension of the datafile.
 
 ```{r}
+#data downloaded from database then saved as .csv file
 
+#defining directory
+working_directory <- 'C:/Users/Hegedüs Anna/Documents/Fall-2024'
+setwd(working_directory)    #set working directory
+
+#loading in data
+data <- read.csv('assignment_3_dataset.csv',  header=T, sep=';', dec = ',')
 ```
 
-## Data and model diagnostics 
+## Data and model diagnostics
+
 ### Data diagnostics
+
 #### Descriptives of the variables
 
 Run an exploratory data analysis (EDA) to investigate the dataset.
 
 ```{r}
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+
+
+
+
+#inspections
+str(data)  #numeric variables OK
+dim(data)  #160 sample OK
+summary(data) #pain max is wrong, mindfullness max is wrong
+
+#defining age as a binary variable is advicable
+#checking the two genders:
+two_gend <- unique(data$sex)
+print(two_gend)
+
+#there is a woman - two choice, omitting or rewriting, i chose the 1st one (cannot be trusted)
+data <- data[data$sex%in%c('female', 'male'), ]
+data$gender_binary <- ifelse(data$sex == 'male', 1, 0) #male == 1, female == 0, assumption : if model coeff not 0 there is a difference between genders
+
+
+
+#cheking for missing values
+missing_summary <- colSums(is.na(data))
+print(missing_summary) #Good
+
+
+
+#visualizing numeric variables as histograms
+numeric_vars <- data %>%
+  select_if(is.numeric)
+
+for (col in colnames(numeric_vars)) {
+  print(col)
+  print(ggplot(numeric_vars, aes_string(x = col)) +
+    geom_histogram(bins = 20, fill = 'red', color = 'black') +
+    labs(title = paste('Histogram of variable : ', col)) +
+    theme_minimal()
+  )
+}
+#notes on distributions
+#pain does have an outlier
+#age margins are far from the middle point and not evenly distributed, so might be outliers
+#pain_cat minimum also
+#mindfulness one point is above 6, outlier
+#the minimum weight can be an outlier
+
+#Creating a correlation matrix and plotting
+#this can be more interesting later with the given predictors, note that weight, IQ and houshold_income have low correlations
+#gender_binary does have meaningfull correlations thus there is a difference between sex
+cor_matrix <- cor(numeric_vars, use = 'complete.obs')
+corrplot(cor_matrix, method = 'circle', type = 'lower', tl.cex = 0.8)
+
 
 ```
 
@@ -78,14 +141,29 @@ If you find values in the dataset during the EDA, that are not correct based on 
 
 ```{r}
 
+#repeating gender
+data <- data[data$sex%in%c('female', 'male'), ]
+data$gender_binary <- ifelse(data$sex == 'male', 1, 0) #male == 1, female == 0, asumption : if model coeff not 0
+
+#cutting the pain and mindfulness outlier
+data <- data[data$pain < 10, ]
+data <- data[data$mindfulness < 6, ]
+
 ```
 
 ### Model diagnostics
+
 #### Build the more complex model
 
 In order to test the more complex model for outliers and to test the assumptions first build the model.
 
 ```{r}
+
+#using lm function, and the given predictors
+complex_model <- lm(pain ~ age + gender_binary + STAI_trait + pain_cat + mindfulness + cortisol_serum + cortisol_saliva, data = data)
+
+#summary
+summary(complex_model)
 
 ```
 
@@ -94,6 +172,32 @@ In order to test the more complex model for outliers and to test the assumptions
 Check for outlier values in the model.
 
 ```{r}
+#using the advised Cooks distance
+cooksd <- cooks.distance(complex_model)
+
+#visualization
+plot(cooksd, type = 'h', main = 'Outlier detection', ylab = 'Cooks Distance')
+abline(h = 4 / length(data$pain), col = 'red', lty = 2)  # Cutoff line
+
+#influential points (points above dashed line)
+influential_points <- which(cooksd > (4 / length(data$pain)))
+
+#defining leverage and visualizing
+leverage <- hatvalues(complex_model)
+plot(leverage, main = 'Leverage Values', ylab = 'Leverage')
+abline(h = 2 * (ncol(model.matrix(complex_model)) / nrow(data)), col = 'blue', lty = 2)  # Cutoff
+
+
+#check for outliers
+# standardization and visualization
+std_res <- rstandard(complex_model)
+plot(std_res, main = 'Standardized Residuals', ylab = 'Standardized Residuals', ylim = c(-4, 4))
+abline(h = c(-3, 3), col = 'green', lty = 2)  # typical outlier range
+
+#no outliers now
+
+#influential points and leverage might be dropped later
+#no need of trimming after seeing the result
 
 ```
 
@@ -102,31 +206,66 @@ Check for outlier values in the model.
 Check the normality assumption.
 
 ```{r}
+#defining the residuals
+residuals <- residuals(complex_model)
 
+#plotting (Q - Q plot)
+qqnorm(residuals)
+qqline(residuals, col = 'red')
+#looks fine
 ```
 
 Check the linearity assumption.
 
 ```{r}
+#Doing a scatter plot for the linearity assumption
+#This plot needs to show linear or random patterns and no curves
+plot(fitted(complex_model), residuals, 
+     main = 'scatterplot', 
+     xlab = 'fit', 
+     ylab = 'residual')
+
+abline(h = 0, col = 'red')
+
+#good for now, but could also use crPlots from car package
 
 ```
 
 Check the homoscedasticty assumption (homogeneity of variance).
 
 ```{r}
+#the plot above can be used, if funnel shape is formed that would indicate a problem, but this does not happen
+#cheking with Breusch-Pagan test as well (wiki : is used to test for heteroskedasticity in a linear regression model.)
+#wiki : In R, this test is performed by the function ncvTest available in the car package
+#interpretation : p < alpha, then heteroscedasticity can occur
 
+#load package
+library(car)
+
+#do the test
+ncvTest(complex_model)
+
+#p value is bigger than alpha (0.05 chosen)
 ```
 
 Check the multicollinearity assumption.
 
-(VIF above 5), or a VIF threshold of 3 is recommended in this paper: http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2009.00001.x/full
+(VIF above 5), or a VIF threshold of 3 is recommended in this paper: <http://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2009.00001.x/full>
 
-Some info about VIF: 
-https://statisticalhorizons.com/multicollinearity
-http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis
+Some info about VIF: <https://statisticalhorizons.com/multicollinearity> <http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity-in-regression-analysis>
 
 ```{r}
+#calcilationg variance inflation factor for each predictor (using car)
+#interpretation as understood : vif < 3 low multicollinearity; vif > 5 high multicollinearity
 
+vif_values <- vif(complex_model)
+vif_values
+
+#cortisol levels have high vif values --> might be because high correlation level
+cortisol_corr <- cor.test(data$cortisol_saliva, data$cortisol_serum)
+cortisol_corr
+
+#I would just drop one of them...
 ```
 
 ### Making decision based on model diagnostics
@@ -134,13 +273,42 @@ http://blog.minitab.com/blog/understanding-statistics/handling-multicollinearity
 If based on the assumption tests you decide to drop a predictor variable you should do that here. Create your updated model.
 
 ```{r}
+#dropping cortisol_salive
+#using lm function, and the given predictors
+complex_model2 <- lm(pain ~ age + gender_binary + STAI_trait + pain_cat + mindfulness + cortisol_serum, data = data)
 
+#summary
+summary(complex_model2)
 ```
 
 #### Checking outliers of the updated model
 
 ```{r}
+#copy pasting
 
+#using the advised Cooks distance
+cooksd <- cooks.distance(complex_model2)
+
+#visualization
+plot(cooksd, type = 'h', main = 'Outlier detection', ylab = 'Cooks Distance')
+abline(h = 4 / length(data$pain), col = 'red', lty = 2)  
+#influential points (points above dashed line)
+influential_points <- which(cooksd > (4 / length(data$pain)))
+
+#defining leverage and visualizing
+leverage <- hatvalues(complex_model2)
+plot(leverage, main = 'Leverage Values', ylab = 'Leverage')
+abline(h = 2 * (ncol(model.matrix(complex_model)) / nrow(data)), col = 'blue', lty = 2)  # Cutoff
+
+
+#check for outliers
+# standardization and visualization
+std_res <- rstandard(complex_model2)
+plot(std_res, main = 'Standardized Residuals', ylab = 'Standardized Residuals', ylim = c(-4, 4))
+abline(h = c(-3, 3), col = 'green', lty = 2)  # typical outlier range
+
+#no outliers either in this updated model now
+#influential points and leverage might be dropped later
 ```
 
 #### Checking assumptions of the updated model
@@ -148,25 +316,46 @@ If based on the assumption tests you decide to drop a predictor variable you sho
 Normality assumption
 
 ```{r}
+#copy pasting
+#defining the residuals
 
+residuals <- residuals(complex_model2)
+
+#plotting (Q - Q plot)
+qqnorm(residuals)
+qqline(residuals, col = 'red')
+#looks fine as well
 ```
 
 Linearity assumption
 
 ```{r}
+#checking in another way
+#good for now, but could also use crPlots from car package
 
+crPlots(complex_model2)
+
+#interpretation
+#only linear trends should appear (dashed and full line on each other)
+#kinda good, maybe age shows some deviance, but it is not much
 ```
 
 Homoscedasticty assumption (homogeneity of variance)
 
 ```{r}
+#do the test
+ncvTest(complex_model2)
 
+#p value is bigger than alpha (0.05 chosen)
 ```
 
 Multicollinearity assumption
 
 ```{r}
+vif_values <- vif(complex_model2)
+vif_values
 
+#nice and clean
 ```
 
 ## Model comparison
@@ -174,18 +363,194 @@ Multicollinearity assumption
 Create the simple model and get the results of the model that needs to be reported based on the What to report section.
 
 ```{r}
+simple_model <- lm(pain ~ age + gender_binary , data = data)
 
+#summary
+summary(simple_model)
+
+
+#doing the reports
+# Report the results of the simpler model and the more complex model. For both models you should report the model test statistics (adj.R2, F, df, and p value). Also, report the statistics describing the coefficients of the predictors in a table format (unstandardized regression coefficients and 95% confidence intervals, standardized regression coefficients (B and Beta values), and p values).
+
+
+#For both models you should report the model test statistics (adj.R2, F, df, and p value)
+#adjusted R^2
+adj_r2_simple <- summary(simple_model)$adj.r.squared
+#adj_r2_complex <- summary(complex_model2)$adj.r.squared
+
+# F stats
+f_stat_simple <- summary(simple_model)$fstatistic
+#f_stat_complex <- summary(complex_model2)$fstatistic
+
+# degrees of freedom from the F stats
+fvalue_simple <- f_stat_simple[1]
+df1_simple <- f_stat_simple[2]
+df2_simple <- f_stat_simple[3]
+
+# fvalue_complex <- f_stat_complex[1]
+# df1_complex <- f_stat_complex[2]
+# df2_complex <- f_stat_complex[3]
+
+#p values
+p_value_simple <- pf(fvalue_simple, df1_simple, df2_simple, lower.tail = FALSE)
+#p_value_complex <- pf(fvalue_complex, df1_complex, df2_complex, lower.tail = FALSE)
+
+#printing
+cat('Simple Model:\n')
+cat('Adjusted R^2:', adj_r2_simple, '\n') #no need of further analysis, terrible value, no correlation
+cat('F-statistic:', f_stat_simple, '\n')
+cat('Degrees of Freedom:', df1_simple, 'and', df2_simple, '\n')
+cat('p-value:', p_value_simple, '\n\n')
+#although p value and f value suggest that the model is predictive I would not use it, because of the low r^2 value
+
+# cat('Complex Model:\n')
+# cat('Adjusted R^2:', adj_r2_complex, '\n'). #acceptable for psychologial data
+# cat('F-statistic:', f_stat_complex, '\n'). #high f value is good
+# cat('Degrees of Freedom:', df1_complex, 'and', df2_complex, '\n') #6 predictors (correct) with 157 observations
+# cat('p-value:', p_value_complex, '\n'). #the predictive value is significant
+
+#just noticed complex should be in different section, so commenting
+
+#Also, report the statistics describing the coefficients of the predictors in a table format (unstandardized regression coefficients and 95% confidence intervals, standardized regression coefficients (B and Beta values), and p values).
+
+# extract coefficients
+unstd_coef <- coef(summary(simple_model))
+
+#define confidence intervals (95%)
+conf_int <- confint(simple_model, level = 0.95)
+
+# stardardize the predictors and recompute the model for standardized coefficients
+scaled_data <- data
+scaled_data$age <- scale(scaled_data$age)
+scaled_data$gender_binary <- scale(scaled_data$gender_binary) #do not know if this is meaningful
+std_simple_model <- lm(pain ~ age + gender_binary, data = scaled_data)  
+std_coef <- coef(std_simple_model) 
+
+
+# create final table
+coef_table <- data.frame(
+  Predictor = rownames(unstd_coef),
+  `B (Unstandardized)` = unstd_coef[, 'Estimate'],
+  `Beta (Standardized)` = c(NA, std_coef[-1]),
+  `95% CI (Lower)` = conf_int[, 1],
+  `95% CI (Upper)` = conf_int[, 2],
+  `p-value` = unstd_coef[, 'Pr(>|t|)']
+)
+
+# Print the table
+print(coef_table, row.names = FALSE)
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that needs to be reported based on the What to report section.
 
 ```{r}
+complex_model2 <- lm(pain ~ age + gender_binary + STAI_trait + pain_cat + mindfulness + cortisol_serum, data = data)
 
+#summary
+summary(complex_model2)
+
+#doing the reports
+# Report the results of the simpler model and the more complex model. For both models you should report the model test statistics (adj.R2, F, df, and p value). Also, report the statistics describing the coefficients of the predictors in a table format (unstandardized regression coefficients and 95% confidence intervals, standardized regression coefficients (B and Beta values), and p values).
+
+
+#For both models you should report the model test statistics (adj.R2, F, df, and p value)
+#adjusted R^2
+adj_r2_complex <- summary(complex_model2)$adj.r.squared
+
+# F stats
+f_stat_complex <- summary(complex_model2)$fstatistic
+
+# degrees of freedom from the F stats
+fvalue_complex <- f_stat_complex[1]
+df1_complex <- f_stat_complex[2]
+df2_complex <- f_stat_complex[3]
+
+#p values
+p_value_complex <- pf(fvalue_complex, df1_complex, df2_complex, lower.tail = FALSE)
+
+#printing
+cat('Complex Model:\n')
+cat('Adjusted R^2:', adj_r2_complex, '\n') #acceptable for psychologial data
+cat('F-statistic:', f_stat_complex, '\n') #high f value is good
+cat('Degrees of Freedom:', df1_complex, 'and', df2_complex, '\n') #6 predictors (correct) with 157 observations
+cat('p-value:', p_value_complex, '\n') #the predictive value is significant
+
+
+#Also, report the statistics describing the coefficients of the predictors in a table format (unstandardized regression coefficients and 95% confidence intervals, standardized regression coefficients (B and Beta values), and p values).
+
+# extract coefficients
+unstd_coef <- coef(summary(complex_model2))
+
+#define confidence intervals (95%)
+conf_int <- confint(complex_model2, level = 0.95)
+
+# stardardize the predictors and recompute the model for standardized coefficients
+scaled_data <- data
+scaled_data$age <- scale(scaled_data$age)
+scaled_data$gender_binary <- scale(scaled_data$gender_binary) #do not know if this is meaningful
+scaled_data$STAI_trait <- scale(scaled_data$STAI_trait)
+scaled_data$mindfulness <- scale(scaled_data$mindfulness)
+scaled_data$cortisol_serum <- scale(scaled_data$cortisol_serum)
+
+std_complex_model2 <- lm(pain ~ age + gender_binary + STAI_trait + pain_cat + mindfulness + cortisol_serum, data = scaled_data)
+std_coef <- coef(std_complex_model2) 
+
+
+# create final table
+coef_table <- data.frame(
+  Predictor = rownames(unstd_coef),
+  `B (Unstandardized)` = unstd_coef[, 'Estimate'],
+  `Beta (Standardized)` = c(NA, std_coef[-1]),
+  `95% CI (Lower)` = conf_int[, 1],
+  `95% CI (Upper)` = conf_int[, 2],
+  `p-value` = unstd_coef[, 'Pr(>|t|)']
+)
+
+# Print the table
+print(coef_table, row.names = FALSE)
+
+# Write up the regression equation of the more complex model in the form of 𝑌 = 𝑏0 + 𝑏1 ∗ X1 + 𝑏2 ∗ X2 +…+ bn * Xn, in which you use the actual regression coefficients of your models. (b0 stands for the intercept and b1, b2 … bn stand for the model coefficients for each of the predictors, and X1, X2, … Xn denote the predictors).
+
+#coefficients to be used
+coefficients <- coef(complex_model2)
+
+# character format
+intercept <- coefficients[1]
+terms <- paste0(coefficients[-1], ' * ', names(coefficients[-1]))
+regression_equation <- paste('Y =', intercept, '+', paste(terms, collapse = ' + '))
+
+# printing
+print(regression_equation)
 ```
 
 Compare the two models.
 
 ```{r}
+# Compare the two models in terms of how much variance they explain of pain’s variability in the sample. Report Akaike information criterion (AIC) for both models and the F test statistic and p value of the likelihood ratio test comparing the two models.
 
+#r^2
+cat('Adjusted R^2 for Simple Model:', adj_r2_simple, '\n') #no need of further analysis, terrible value, no correlation
+cat('Adjusted R^2 for Complex Model:', adj_r2_complex, '\n') #good for psychological data
+print('Comparing the two models (simple and complex), we can see that the simple model is almost unable to explain anything of the variance of the pains variability, thus I would strongly recommend dropping. Meanwhile the ability of the complex model is better, and for a psychological or biological sample is acceptable, the model is hardly perfect or monetizable' )
+
+#aic
+aic_simple <- AIC(simple_model)
+aic_complex <- AIC(complex_model2)
+cat('AIC for Simple Model:', aic_simple, '\n')
+cat('AIC for Complex Model:', aic_complex, '\n')
+print('Observing the AIC of the models we can see that the complex model has the lower value, thus that one is prefered according to the the r^2 comparison result as well.' )
+
+
+#fstat and p value
+cat('F-statistic for Simple Model:', f_stat_simple, '\n')
+cat('p-value for Simple Model:', p_value_simple, '\n\n')
+
+cat('F-statistic for Complex Model:', f_stat_complex, '\n')
+cat('p-value for Complex Model:', p_value_complex, '\n\n')
+
+print('F-statistics show us whether one predictor of the model is significantly related to the outcome variable. In both cases we see that there is relation between the variables, the more complex model does better in this case as well, the higher the better value is. The p value indicates whether the model has predictive power or not, the lower the better. In both cases we can conclude that the models are truly predictive on the other hand every evidence srongly support the idea of utilizing the more complex model in further usage')
+
+
+
+# Finished
 ```
-

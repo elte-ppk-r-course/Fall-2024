@@ -17,6 +17,7 @@ You will have to create 3 plots based on the datasets and instructions detailed 
 -   Data visuzlization (ggplot2)
 
 ```{r setup, include=FALSE}
+rm(list=ls())
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(tidytuesdayR)
@@ -31,7 +32,45 @@ The 2020-09-22 TidyTueday datasets are about climbing expeditions. From the thre
 -   The bar colors use the viridis palette and light theme.
 
 ```{r}
+library(forcats)
+library(ggplot2)
+library(dplyr)
 
+tuesdata <- tidytuesdayR::tt_load('2020-09-22') #API limit reached...
+
+data <- tuesdata$expeditions
+
+#top 15 peaks and dropping the category other then counting
+frequent_peaks <- data %>%
+  mutate(data_filt = fct_lump(peak_name, n = 15)) %>%
+  filter(data_filt != "Other") %>%
+  count(data_filt, name = 'number_of_exp')
+
+frequent_peaks <- frequent_peaks%>%
+  arrange((number_of_exp))
+
+fp <- unique(frequent_peaks$data_filt) #for the order
+
+frequent_peaks_by_season <- data %>%
+  mutate(data_filt = fct_lump(peak_name, n = 15)) %>%
+  filter(data_filt != "Other") %>%
+  group_by(data_filt, season) %>% #group by peak and season
+  summarize(number_of_exp = n(), .groups = "drop") #count occurrences per group
+
+ggplot(frequent_peaks_by_season, aes(x = factor(data_filt, levels = fp), y = number_of_exp, fill = season)) +
+  geom_bar(stat = "identity", position = "stack") + #defining bars
+  scale_fill_viridis_d(option = "D") +             #viridis
+  theme_light() +                                  #light theme
+  labs(
+    title = "Top 15 most popular peaks stacked by season of expedition",  #title
+    x = "",   #no X-axis (this would be the y)
+    y = "Number of Expeditions",  #y-axis label
+    fill = "Season"  #the given parameter
+  ) +
+  theme(
+    legend.position = "bottom"   #modify position
+  ) +
+   coord_flip() #coordinate transformation
 ```
 
 ## Task 2: PhDs awarded
@@ -45,6 +84,31 @@ Notes:
 -   The line size is 1.2, the colors are from the brewer "Dark2" palette. The theme is set to minimal.
 
 ```{r}
+library(forcats)
+library(ggplot2)
+library(scales) 
+library(RColorBrewer) 
+
+tuesdata2 <- tidytuesdayR::tt_load('2019-02-19') #API limit reached...
+data2 <- read.csv("C:/Users/Hegedüs Anna/Documents/Fall-2024/data/phd_by_field.csv")
+
+phd_groupping <- data2 %>%
+  group_by(broad_field, year) %>%    #group by broad field and year
+  summarize(number_of_phds = sum(n_phds, na.rm = TRUE), .groups = "drop") #count 
+
+
+ggplot(phd_groupping, aes(x = year, y = number_of_phds, color = broad_field, group = broad_field)) +
+  geom_line(linewidth  = 1.2) +  #set line size
+  scale_color_brewer(palette = "Dark2") +  #use Dark2 color palette from RColorBrewer
+  scale_x_continuous(breaks = pretty_breaks(n = 5)) +  #set pretty breaks for x-axis
+  scale_y_continuous(labels = comma_format()) +  #format y-axis labels with commas
+  theme_minimal() +  #use minimal theme
+  labs(
+    title = "Number of awarded Ph.D.-s in the US by year",
+    x = "",
+    y = "",
+    color = "Broad field"
+  )
 
 ```
 
@@ -59,5 +123,69 @@ Notes:
 -   The point size is 2, . The theme is set to light.
 
 ```{r}
+library(ggplot2)
+library(scales)
+library(readr)
+library(dplyr)
+
+
+#tuesdata3 <- tidytuesdayR::tt_load('2019-11-05') 
+data3 <- read_csv("C:/Users/Hegedüs Anna/Documents/Fall-2024/data/commute.csv")  #note: state name abbreviations not provided
+
+#states names provided in built in R
+state_table <- data.frame(
+  state = state.name,
+  state_abb = state.abb
+  )
+
+
+commute_groupping <- data3 %>%
+  group_by(state, mode, state_region) %>% #group by broad field and year
+  summarize(number_of_commuters = sum(n, na.rm = TRUE), .groups = "drop") #count 
+
+#make a scatter plot, so a merging is needed
+d3_bike = commute_groupping %>% 
+  filter(mode == 'Bike')
+d3_walk = commute_groupping %>% 
+  filter(mode == 'Walk')
+
+
+#Note : Because the abbreviations are not provided DC is lost....
+#Note2 : Because the criteria of the plotted text abbs not given, using the built on check overlap argument, but the results are not same. What is the criteria??
+
+
+merged = merge(d3_bike, d3_walk, by = c('state', 'state_region'))
+
+#with these steps the capital can be saved
+DC <- merged %>%
+  filter(state == 'District of Columbia') %>%
+  mutate(state_abb = 'DC')
+merged = merge(merged, state_table, by = c('state'))
+merged = rbind(merged, DC)
+
+
+#calculate the log (not needed because built in scale_log functions)
+# merged$walk_log = log(merged$number_of_commuters.y)
+# merged$bike_log = log(merged$number_of_commuters.x)
+merged$walk_log = (merged$number_of_commuters.y)
+merged$bike_log = (merged$number_of_commuters.x)
+
+
+ggplot(merged, aes(x = walk_log, y = bike_log, color = state_region)) +
+  geom_point(size = 2) +  #set point size
+  scale_x_log10(labels = comma_format()) +  #log scale for x-axis with comma format
+  scale_y_log10(labels = comma_format()) + #log scale for y-axis with comma format
+  geom_text(aes(label = state_abb), color = "black", size = 5, check_overlap = TRUE) +
+  theme_light() +  #use light theme
+  labs(
+    x = "Number of ppl walking to work (log N)", 
+    y = "Number of ppl biking to work (log N)", 
+    title = "Title number of people walking vs biking to work in each USA state",  #note, the Title part could be a typo here
+    color = "State region"
+  )
+
+
+
+#Finished
 
 ```

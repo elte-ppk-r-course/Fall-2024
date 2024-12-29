@@ -32,7 +32,14 @@ Note: There are several different ways to solve these tasks, feel free to come u
 Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You can also find the codebook there.
 
 ```{r}
+library(readr)
 
+#defining the raw path to the file
+d_url <- 'https://raw.githubusercontent.com/nthun/cocktail-balance/refs/heads/master/cocktail_data.tsv'
+
+#reading and printing the file
+data <- read_tsv(d_url)
+head(data)
 ```
 
 ## 2. Transform the data table and clean the ingredient variable!
@@ -40,7 +47,24 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 The ingredients are currently in a single cell for each cocktail. It would be better to put them in separate rows. Also, the variable should be cleaned of all quantities (e.g. 1/2 oz, 2 dashes, etc.), and the indicator of alcohol content (e.g. 47.3% abv). You will need to use this cleaned table in later tasks.
 
 ```{r}
+library(tidyr)
+library(dplyr)
+library(stringr)
 
+cleaned_table <- data %>%
+  separate_rows(ingredients, sep = "<br/>|<br>|<b4/>") %>% #separation of ingredients into separate rows
+  mutate(
+      ingredient_clean = str_extract(ingredients, "\\s*[a-zA-Z]+\\s*([^\\(]*)"),   #remove unwanted characters
+      ingredient_clean = str_remove_all(ingredient_clean, "\\boz\\b|\\bdrops?\\b|\\bdashes?\\b|\\d+(\\.\\d+)?%\\s*abv"), #remove 'oz', 'drop', 'drops', 'dash', 'dashes', 'abv'
+      ingredient_clean = str_squish(ingredient_clean),  #remove unwanted spaces
+      ingredient_clean = tolower(ingredient_clean)  #capitals to lowercase
+    ) %>%
+  
+#remove empty rows or rows with no ingredients
+  filter(!is.na(ingredient_clean), ingredient_clean != "")
+
+#review the cleaned table 
+head(cleaned_table) 
 ```
 
 ## 3. All ingredients in alphabetical order
@@ -48,7 +72,11 @@ The ingredients are currently in a single cell for each cocktail. It would be be
 Before opening the bar, you need to find a reliable supplier that has all the ingredients. You need to send a list of all possible ingredients you will need. They don't need the quantities (i.e. how many of these are needed), just the names of the ingredients.
 
 ```{r}
+#getting the unique ingredients
+unique_ing <- sort(unique(cleaned_table$ingredient_clean))
 
+#checking if requirements are met
+print(unique_ing) 
 ```
 
 ## 4. Number of unique ingredients
@@ -56,7 +84,11 @@ Before opening the bar, you need to find a reliable supplier that has all the in
 How many different ingredients you will need?
 
 ```{r}
+#getting the length of the list
+num_unique_ing <- length(unique_ing)
 
+#checking the results
+print(num_unique_ing) 
 ```
 
 ## 5. What are the top 10 ingredients?
@@ -65,6 +97,19 @@ What are the 10 most frequently used ingredients? If there are ties, you can lis
 
 ```{r}
 
+top_10_ingr <- cleaned_table %>%
+  count(ingredient_clean, name = "Number", sort = TRUE) %>% #count ingredient frequencies
+  arrange(desc(Number))
+
+#get the 10th largest usage value (to account for ties)
+largest_usage <- top_10_ingr$Number[10]
+
+#list ingredients with frequency >= the 10th largest value
+top_10_ingr <- top_10_ingr %>%
+  filter(Number >= largest_usage)
+
+#printing
+print(top_10_ingr)
 ```
 
 ## 6. Which cocktail(s) has/have the most ingredients?
@@ -72,12 +117,47 @@ What are the 10 most frequently used ingredients? If there are ties, you can lis
 Count the number of ingredients and filter all the cocktails that has that many.
 
 ```{r}
+library(dplyr)
 
+#count the number of ingredients for each cocktail
+results_df2 <- cleaned_table %>%
+  group_by(name) %>%   #group by cocktail name
+  summarise(Number = n(), .groups = "drop") %>%  #count the nr. of ingredients per cocktail
+  filter(Number == max(Number))  #filter cocktails with max. number of ingredients
+
+#get names of cocktails with the most ingredients
+cocktails_most_ing <- results_df2$name
+
+#check results
+print(cocktails_most_ing)
 ```
 
 ## 7. How many ingredients appear in only one cocktail (rare ingredient)?
 
 ```{r}
+
+#creating an empty dataframe
+results_df <- data.frame(Number = numeric(0), Ingredient = character(0), stringsAsFactors = FALSE)
+
+for (i in 1:num_unique_ing){
+  
+  ing_current <- unique_ing[i] #defining the given ingredient
+  
+  c_current <- cleaned_table[(cleaned_table$ingredient_clean == ing_current), ] #filtering
+  
+  usage <- length(c_current$ingredient_clean) #counting
+  
+  results_df <- rbind(results_df, data.frame(Number = usage, Ingredient = ing_current))
+  
+}
+
+#sorting
+results_df <- results_df[(results_df$Number == 1), ]
+
+rare_ing <- results_df$Ingredient
+
+print(rare_ing)
+print(length(rare_ing))
 
 ```
 
@@ -85,12 +165,37 @@ Count the number of ingredients and filter all the cocktails that has that many.
 
 ```{r}
 
+#creating an empty dataframe
+results_df3 <- data.frame(Ingredient = character(0), Cocktail = character(0), stringsAsFactors = FALSE)
+
+for (i in 1:length(rare_ing)){
+  
+  ing_current <- rare_ing[i] #defining the given ingredient
+  
+  c_current_df <- cleaned_table[(cleaned_table$ingredient_clean == ing_current), ] #filtering
+  
+  cocktail_name <- c_current_df$name #defining
+  
+  results_df3 <- rbind(results_df3, data.frame(Cocktail = cocktail_name, Ingredient = ing_current))
+  
+}
+
+cocktails_with_rare <- results_df3$Cocktail
+
+print(cocktails_with_rare)
+
 ```
 
 ## 9. What are the cocktails without rare ingredients?
 
 ```{r}
-  
+#without rare = all - with_rare
+#the previous one could have been easily solved with %in% but the loop was already there so I did not think of that
+
+without_rare <- cleaned_table[!(cleaned_table$name%in%cocktails_with_rare), ] #filtering
+without_rare_cocktails <- unique(without_rare$name)
+
+print(without_rare_cocktails)
 ```
 
 ## 10. Create a cheat sheet for the bartender!
@@ -99,8 +204,42 @@ Create a matrix that shows all cocktail names as rows and all ingredients as col
 
 ```{r}
 
-```
+all_cocktails <- unique(cleaned_table$name)
+all_ings <- unique(cleaned_table$ingredient_clean)
 
+# Create a matrix
+
+#For an empty cell I know there should be this code:
+#data_matrix <- matrix(character(0), nrow = length(all_cocktails), ncol = length(all_ings))getwd()
+
+#however NA looks worse than a simple 0, so I prefer using this:
+data_matrix <- matrix('0', nrow = length(all_cocktails), ncol = length(all_ings))
+
+# Assign column names from list1 and row names from list2
+colnames(data_matrix) <- all_ings
+rownames(data_matrix) <- all_cocktails
+
+for (i in 1:length(all_cocktails)){
+  for (ii in 1:length(all_ings)){
+    
+    df_current = cleaned_table[cleaned_table$name == all_cocktails[i],]
+    df_current2 = df_current[df_current$ingredient_clean == all_ings[ii],]
+    
+    if (length(df_current2$name) != 0){
+      data_matrix[all_cocktails[i], all_ings[ii]] = 'X'
+    }
+  }
+}
+  
+
+
+
+# Print the matrix
+print(data_matrix)
+
+
+#Finished
+```
 
 Congrats, the bar is now officially open!
 
